@@ -10,6 +10,14 @@ option(COPYCAT_TEST "Build tests" OFF)
 if(UNIX)
   include(CheckCXXCompilerFlag)
   add_compile_options(-W -Wall -Wextra)
+
+  # turn off region warnings from mockturtle
+  foreach (WARNING unknown-pragmas gnu-anonymous-struct nested-anon-types)
+    check_cxx_compiler_flag("-Wno-${WARNING}" HAS_WNO_${WARNING})
+    if (HAS_WNO_${WARNING})
+      add_compile_options(-Wno-${WARNING})
+    endif()
+  endforeach()
 endif()
 
 add_subdirectory(include)
