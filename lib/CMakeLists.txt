@@ -17,6 +17,7 @@ endif()
 if (NOT TARGET lorina)
   add_library(lorina INTERFACE)
   target_include_directories(lorina INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/lorina/include)
+  target_link_libraries(lorina INTERFACE fmt rang)
 endif()
 
 if (NOT TARGET mockturtle)

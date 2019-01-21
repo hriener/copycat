@@ -165,11 +165,11 @@ public:
  * `SimulationType` and one must pass an instance of a `Simulator` that
  * implements the three methods:
  * - `SimulationType compute_constant(bool)`
- * - `SimulationType compute_pi(index)`
+ * - `SimulationType compute_ci(index)`
  * - `SimulationType compute_not(SimulationType const&)`
  *
  * The method `compute_constant` returns a simulation value for a constant
- * value.  The method `compute_pi` returns a simulation value for a primary
+ * value.  The method `compute_ci` returns a simulation value for a primary
  * input based on its index, and `compute_not` to invert a simulation value.
  *
  * This method returns a map that maps each node to its computed simulation
@@ -180,7 +180,7 @@ public:
  * - `get_constant`
  * - `constant_value`
  * - `get_node`
- * - `foreach_pi`
+ * - `foreach_ci`
  * - `foreach_gate`
  * - `fanin_size`
  * - `num_pos`
@@ -196,7 +196,7 @@ node_map<SimulationType, Ntk> simulate_nodes( Ntk const& ntk, Simulator const& s
   static_assert( has_get_constant_v<Ntk>, "Ntk does not implement the get_constant method" );
   static_assert( has_constant_value_v<Ntk>, "Ntk does not implement the constant_value method" );
   static_assert( has_get_node_v<Ntk>, "Ntk does not implement the get_node method" );
-  static_assert( has_foreach_pi_v<Ntk>, "Ntk does not implement the foreach_pi method" );
+  static_assert( has_foreach_ci_v<Ntk>, "Ntk does not implement the foreach_ci method" );
   static_assert( has_foreach_gate_v<Ntk>, "Ntk does not implement the foreach_gate method" );
   static_assert( has_foreach_fanin_v<Ntk>, "Ntk does not implement the foreach_fanin method" );
   static_assert( has_fanin_size_v<Ntk>, "Ntk does not implement the fanin_size method" );
@@ -210,8 +210,8 @@ node_map<SimulationType, Ntk> simulate_nodes( Ntk const& ntk, Simulator const& s
   {
     node_to_value[ntk.get_node( ntk.get_constant( true ) )] = sim.compute_constant( ntk.constant_value( ntk.get_node( ntk.get_constant( true ) ) ) );
   }
-  ntk.foreach_pi( [&]( auto const& n, auto i ) {
-    node_to_value[n] = sim.compute_pi( i );
+  ntk.foreach_ci( [&]( auto const& n, auto i ) {
+    node_to_value[n] = sim.compute_ci( i );
   } );
 
   ntk.foreach_gate( [&]( auto const& n ) {
