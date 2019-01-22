@@ -2,6 +2,7 @@
 #include <mockturtle/networks/aig.hpp>
 #include <mockturtle/algorithms/simulation.hpp>
 #include <mockturtle/io/aiger_reader.hpp>
+#include <copycat/protocol_extractor.hpp>
 #include <lorina/aiger.hpp>
 #include <kitty/print.hpp>
 
@@ -31,83 +32,6 @@ public:
   std::vector<TT> values;
 };
 
-struct vertex
-{
-  bool operator==( vertex const &other ) const
-  {
-    return input == other.input && output == other.output;
-  }
-
-  std::string input;
-  std::string output;
-
-  std::vector<uint32_t> parents;
-  std::vector<uint32_t> children;
-};
-
-namespace std
-{
-
-template<>
-struct hash<vertex>
-{
-  using argument_type = vertex;
-  using result_type = std::size_t;
-
-  result_type operator()( argument_type const& g ) const noexcept {
-    result_type const h1 ( std::hash<std::string>{}(g.input) );
-    result_type const h2 ( std::hash<std::string>{}(g.output) );
-    return h1 ^ ( h2 << 1 );
-  }
-}; /* hash<vertex> */
-
-} /* namespace std */
-
-class graph
-{
-public:
-  explicit graph()
-  {}
-
-  vertex get_root()
-  {
-    return add_node( "root", "root" );
-  }
-
-  vertex add_node( std::string const &input, std::string const &output )
-  {
-    auto const n = vertex{input,output};
-    auto const index = nodes.size();
-    if ( node_map.find( n ) == node_map.end() )
-    {
-      nodes.emplace_back( n );
-      node_map.emplace( n, index );
-    }
-    return n;
-  }
-
-  void add_edge( vertex& source, vertex& target ) const
-  {
-    auto const s_index = node_map.find( source )->second;
-    auto const t_index = node_map.find( target )->second;
-    source.children.emplace_back( t_index );
-    target.parents.emplace_back( s_index );
-  }
-
-  void write_dot()
-  {
-    assert( false && "yet not implemented" );
-  }
-
-  uint32_t size() const
-  {
-    return nodes.size();
-  }
-
-  std::vector<vertex> nodes;
-  std::unordered_map<vertex,uint32_t> node_map;
-}; /* graph */
-
 TEST_CASE( "Dummy test", "[simple]" )
 {
   auto const num_vars = 8u; // simulate 2^num_vars innputs in parallel
@@ -115,7 +39,7 @@ TEST_CASE( "Dummy test", "[simple]" )
 
   // total number of samples = 2^num_vars * num_time_steps
 
-  graph g;
+  copycat::protocol_graph g;
   aig_network aig;
   auto const result = lorina::read_aiger( "", aiger_reader( aig ) );
   CHECK( result == lorina::return_code::success );
@@ -134,8 +58,8 @@ TEST_CASE( "Dummy test", "[simple]" )
       sim.values[index] = tt;
     });
 
-  vertex prev_node = g.get_root();
-  vertex curr_node;
+  auto prev_node = g.get_root();
+  auto curr_node = g.get_root();
   for ( auto k = 0u; k < num_time_steps; ++k )
   {
     ++seed;
