@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Options
 option(COPYCAT_TEST "Build tests" OFF)
+option(COPYCAT_EXAMPLES "Build examples" ON)
 
 if(UNIX)
   include(CheckCXXCompilerFlag)
@@ -22,6 +23,10 @@ endif()
 
 add_subdirectory(include)
 add_subdirectory(lib)
+
+if(COPYCAT_EXAMPLES)
+  add_subdirectory(examples)
+endif()
 
 if(COPYCAT_TEST)
   add_subdirectory(test)
