@@ -64,14 +64,14 @@ class default_simulator<bool>
 {
 public:
   default_simulator() = delete;
-  default_simulator( std::vector<bool> const& assignments ) : assignments( assignments ) {}
+  default_simulator( std::vector<bool>& assignments ) : assignments( assignments ) {}
 
   bool compute_constant( bool value ) const { return value; }
-  bool compute_pi( uint32_t index ) const { return assignments[index]; }
+  bool compute_ci( uint32_t index ) const { return assignments[index]; }
   bool compute_not( bool value ) const { return !value; }
 
 private:
-  std::vector<bool> assignments;
+  std::vector<bool>& assignments;
 };
 
 /*! \brief Simulates Boolean assignments with input word.
@@ -87,7 +87,7 @@ public:
   input_word_simulator( uint64_t word ) : word( word ) {}
 
   bool compute_constant( bool value ) const { return value; }
-  bool compute_pi( uint32_t index ) const { return ( word >> index ) & 1; }
+  bool compute_ci( uint32_t index ) const { return ( word >> index ) & 1; }
   bool compute_not( bool value ) const { return !value; }
 
 private:
@@ -113,7 +113,7 @@ public:
     return value ? ~tt : tt;
   }
 
-  kitty::dynamic_truth_table compute_pi( uint32_t index ) const
+  kitty::dynamic_truth_table compute_ci( uint32_t index ) const
   {
     kitty::dynamic_truth_table tt( num_vars );
     kitty::create_nth_var( tt, index );
@@ -145,7 +145,7 @@ public:
     return value ? ~tt : tt;
   }
 
-  kitty::static_truth_table<NumVars> compute_pi( uint32_t index ) const
+  kitty::static_truth_table<NumVars> compute_ci( uint32_t index ) const
   {
     kitty::static_truth_table<NumVars> tt;
     kitty::create_nth_var( tt, index );
@@ -232,11 +232,11 @@ node_map<SimulationType, Ntk> simulate_nodes( Ntk const& ntk, Simulator const& s
  * `SimulationType` and one must pass an instance of a `Simulator` that
  * implements the three methods:
  * - `SimulationType compute_constant(bool)`
- * - `SimulationType compute_pi(index)`
+ * - `SimulationType compute_ci(index)`
  * - `SimulationType compute_not(SimulationType const&)`
  *
  * The method `compute_constant` returns a simulation value for a constant
- * value.  The method `compute_pi` returns a simulation value for a primary
+ * value.  The method `compute_ci` returns a simulation value for a primary
  * input based on its index, and `compute_not` to invert a simulation value.
  *
  * This method returns a map that maps each node to its computed simulation
@@ -288,7 +288,7 @@ void simulate_nodes( Ntk const& ntk, unordered_node_map<SimulationType, Ntk>& no
   ntk.foreach_pi( [&]( auto const& n, auto i ) {
     if ( !node_to_value.has( n ) )
     {
-      node_to_value[n] = sim.compute_pi( i );
+      node_to_value[n] = sim.compute_ci( i );
     }
   } );
 
@@ -313,11 +313,11 @@ void simulate_nodes( Ntk const& ntk, unordered_node_map<SimulationType, Ntk>& no
  * `SimulationType` and one must pass an instance of a `Simulator` that
  * implements the three methods:
  * - `SimulationType compute_constant(bool)`
- * - `SimulationType compute_pi(index)`
+ * - `SimulationType compute_ci(index)`
  * - `SimulationType compute_not(SimulationType const&)`
  *
  * The method `compute_constant` returns a simulation value for a constant
- * value.  The method `compute_pi` returns a simulation value for a primary
+ * value.  The method `compute_ci` returns a simulation value for a primary
  * input based on its index, and `compute_not` to invert a simulation value.
  *
  * This method returns a vector that maps each primary output (ordered by
