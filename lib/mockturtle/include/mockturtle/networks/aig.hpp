@@ -460,7 +460,7 @@ public:
 
   uint32_t fanin_size( node const& n ) const
   {
-    if ( is_constant( n ) || is_pi( n ) )
+    if ( is_constant( n ) || is_ci( n ) )
       return 0;
     return 2;
   }
@@ -472,7 +472,7 @@ public:
 
   bool is_and( node const& n ) const
   {
-    return n > 0 && !is_pi( n );
+    return n > 0 && !is_ci( n );
   }
 
   bool is_or( node const& n ) const
@@ -744,14 +744,14 @@ public:
   {
     detail::foreach_element_if( ez::make_direct_iterator<uint64_t>( 1 ), /* start from 1 to avoid constant */
                                 ez::make_direct_iterator<uint64_t>( _storage->nodes.size() ),
-                                [this]( auto n ) { return !is_pi( n ); },
+                                [this]( auto n ) { return !is_ci( n ); },
                                 fn );
   }
 
   template<typename Fn>
   void foreach_fanin( node const& n, Fn&& fn ) const
   {
-    if ( n == 0 || is_pi( n ) )
+    if ( n == 0 || is_ci( n ) )
       return;
 
     static_assert( detail::is_callable_without_index_v<Fn, signal, bool> ||
@@ -792,7 +792,7 @@ public:
   {
     (void)end;
 
-    assert( n != 0 && !is_pi( n ) );
+    assert( n != 0 && !is_ci( n ) );
 
     auto const& c1 = _storage->nodes[n].children[0];
     auto const& c2 = _storage->nodes[n].children[1];
@@ -809,7 +809,7 @@ public:
   {
     (void)end;
 
-    assert( n != 0 && !is_pi( n ) );
+    assert( n != 0 && !is_ci( n ) );
 
     auto const& c1 = _storage->nodes[n].children[0];
     auto const& c2 = _storage->nodes[n].children[1];
