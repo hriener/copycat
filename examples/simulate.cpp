@@ -59,7 +59,7 @@ int main( int argc, char* argv[] )
   simulator_t sim( assignments );
 
   uint32_t counter;
-  for ( auto k = 0u; k < num_time_steps; ++k )
+  for ( auto k = 1u; k < num_time_steps; ++k )
   {
     /* simulate nodes */
     auto const v = simulate_nodes<bool, aig_network, simulator_t>( aig, sim );
