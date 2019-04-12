@@ -6,6 +6,60 @@
 
 using namespace mockturtle;
 
+class waveform
+{
+public:
+  explicit waveform( uint32_t num_traces, uint32_t num_time_steps )
+    : traces( num_traces, std::vector<bool>( num_time_steps ) )
+  {
+  }
+
+  std::vector<bool> get_trace_by_index( uint32_t index ) const
+  {
+    return traces.at( index );
+  }
+
+  std::vector<bool> get_trace_by_name( std::string const& name ) const
+  {
+    return get_trace_by_index( name_to_index.at( name ) );
+  }
+
+  void print( uint32_t beg = 0, uint32_t end = 0 ) const
+  {
+    if ( traces.size() == 0 )
+    {
+      std::cout << "NO TRACES" << std::endl;
+      return;
+    }
+
+    assert( end <= beg );
+    if ( beg == end )
+      end = traces[0u].size();
+    for ( const auto& t : traces )
+    {
+      for ( uint32_t i = beg; i < end; ++i )
+      {
+        std::cout << t.at( i );
+      }
+      std::cout << std::endl;
+    }
+  }
+
+  void set_value( uint32_t index, uint32_t time_frame, bool value )
+  {
+    traces[index][time_frame] = value;
+  }
+
+  bool get_value( uint32_t index, uint32_t time_frame ) const
+  {
+    return traces.at( index ).at( time_frame );
+  }
+
+protected:
+  std::map<std::string,uint32_t> name_to_index;
+  std::vector<std::vector<bool>> traces;
+}; /* waveform */
+
 template<typename Ntk, typename RandomGenerator>
 class random_simulator
 {
@@ -125,23 +179,52 @@ protected:
   std::ostream& os;
 }; /* simulation_value_printer */
 
-std::vector<std::vector<bool>> read_stimuli( std::string const& filename )
+template<typename Ntk>
+class waveform_generator
 {
-  std::vector<std::vector<bool>> stimuli;
-  std::ifstream infile( filename );
-  std::string line;
-  while ( std::getline( infile, line ) )
+public:
+  explicit waveform_generator( Ntk const& ntk, waveform& wf )
+    : ntk( ntk )
+    , wf( wf )
   {
-    std::istringstream iss( line );
-    std::vector<bool> assignments( line.size() );
-    for ( auto i = 0u; i < line.size(); ++i )
-    {
-      assignments[i] = line[i] == '1' ? true : false;
-    }
-    stimuli.emplace_back( assignments );
   }
-  return stimuli;
-}
+
+  void on_time_frame_start( uint32_t time_frame )
+  {
+    current_time_frame = time_frame;
+  }
+
+  void on_ro( uint32_t index, bool value )
+  {
+    wf.set_value( index + ntk.num_pis(), current_time_frame, value );
+  }
+
+  void on_pi( uint32_t index, bool value )
+  {
+    wf.set_value( index, current_time_frame, value );
+  }
+
+  void on_po( uint32_t index, bool value )
+  {
+    wf.set_value( index + ntk.num_cis(), current_time_frame, value );
+  }
+
+  void on_ri( uint32_t index, bool value )
+  {
+    (void)index;
+    (void)value;
+  }
+
+  void on_time_frame_end( uint32_t time_frame )
+  {
+    (void)time_frame;
+  }
+
+protected:
+  Ntk const& ntk;
+  waveform& wf;
+  uint32_t current_time_frame = 0;
+}; /* waveform_generator */
 
 template<typename Ntk, typename Simulator, typename Callback>
 void simulate( Ntk const& ntk, Simulator& sim, uint32_t num_time_steps, Callback& callback )
@@ -197,6 +280,24 @@ void simulate( Ntk const& ntk, Simulator& sim, uint32_t num_time_steps, Callback
   }
 }
 
+std::vector<std::vector<bool>> read_stimuli( std::string const& filename )
+{
+  std::vector<std::vector<bool>> stimuli;
+  std::ifstream infile( filename );
+  std::string line;
+  while ( std::getline( infile, line ) )
+  {
+    std::istringstream iss( line );
+    std::vector<bool> assignments( line.size() );
+    for ( auto i = 0u; i < line.size(); ++i )
+    {
+      assignments[i] = line[i] == '1' ? true : false;
+    }
+    stimuli.emplace_back( assignments );
+  }
+  return stimuli;
+}
+
 int main( int argc, char* argv[] )
 {
   if ( argc != 3 )
@@ -218,12 +319,14 @@ int main( int argc, char* argv[] )
   std::cout << "[i] simulate: " << model_file << std::endl;
 
   /* random simulation */
-  std::default_random_engine::result_type seed = 0xcafeaffe;
+  std::default_random_engine::result_type seed = 0; // 0xcafeaffe;
   auto gen = std::bind( std::uniform_int_distribution<>(0,1), std::default_random_engine( seed ) );
 
+#if 0
   random_simulator sim( aig, gen );
   simulation_value_printer printer( aig, std::cout );
   simulate( aig, sim, /* #time steps = */16, printer );
+#endif
 
 #if 0
   /* simulation with stimuli */
@@ -231,6 +334,12 @@ int main( int argc, char* argv[] )
   simulation_value_printer printer( aig, std::cout );
   simulate( aig, sim, stimuli.size(), printer );
 #endif
+
+  random_simulator sim( aig, gen );
+  waveform wf( /* #signals = */ aig.num_cis() + aig.num_pos(), /* #time steps = */ 16 );
+  waveform_generator waveform_gen( aig, wf );
+  simulate( aig, sim, /* #time steps = */16, waveform_gen );
+  wf.print();
 
   return 0;
 }
