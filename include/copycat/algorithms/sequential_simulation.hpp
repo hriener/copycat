@@ -58,7 +58,7 @@ public:
   bool initialize_ro( uint32_t index )
   {
     (void)index;
-    return gen();
+    return 0u;
   }
 
   bool compute_pi( uint32_t index, uint32_t time_frame )
@@ -108,7 +108,7 @@ template<typename Ntk, typename Simulator, typename Callback>
 void simulate( Ntk const& ntk, Simulator& sim, uint32_t num_time_steps, Callback& callback )
 {
   using namespace mockturtle;
-  
+
   /* initialize simulator */
   std::vector<bool> assignments( ntk.num_cis() );
   for ( auto i = 0u; i < ntk.num_pis(); ++i )
@@ -120,7 +120,7 @@ void simulate( Ntk const& ntk, Simulator& sim, uint32_t num_time_steps, Callback
   combinational_simulator_t comb_sim( assignments );
 
   uint32_t index;
-  for ( auto k = 1u; k < num_time_steps; ++k )
+  for ( auto k = 0u; k < num_time_steps; ++k )
   {
     callback.on_time_frame_start( k );
 

@@ -67,6 +67,7 @@ public:
     assert( end <= beg );
     if ( beg == end )
       end = traces[0u].size();
+
     for ( const auto& t : traces )
     {
       for ( uint32_t i = beg; i < end; ++i )
