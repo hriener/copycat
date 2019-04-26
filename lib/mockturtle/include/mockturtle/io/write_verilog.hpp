@@ -111,15 +111,15 @@ void write_verilog( Ntk const& ntk, std::ostream& os )
   static_assert( has_is_maj_v<Ntk>, "Ntk does not implement the is_maj method" );
   static_assert( has_node_to_index_v<Ntk>, "Ntk does not implement the node_to_index method" );
 
-  assert( ntk.is_combinational() && "Writing sequential networks is not supported" ); 
-  
+  assert( ntk.is_combinational() && "Writing sequential networks is not supported" );
+
   const auto xs = map_and_join( ez::make_direct_iterator<decltype( ntk.num_pis() )>( 0 ),
                                 ez::make_direct_iterator( ntk.num_pis() ),
                                 []( auto i ) { return fmt::format( "x{}", i ); }, ", "s );
   const auto ys = map_and_join( ez::make_direct_iterator<decltype( ntk.num_pis() )>( 0 ),
                                 ez::make_direct_iterator( ntk.num_pos() ),
                                 []( auto i ) { return fmt::format( "y{}", i ); }, ", "s );
-  
+
   os << fmt::format( "module top({}, {});\n", xs, ys )
      << fmt::format( "  input {};\n", xs )
      << fmt::format( "  output {};\n", ys );
