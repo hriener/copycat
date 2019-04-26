@@ -88,6 +88,21 @@ public:
     return traces.at( index ).at( time_frame );
   }
 
+  template<typename Fn>
+  void foreach_value( Fn&& fn )
+  {
+    uint64_t const num_time_steps = traces.size() > 0u ? traces[0].size() : 0;
+    std::vector<bool> values_in_current_time_step( traces.size() );
+    for ( auto time_step = 0u; time_step < num_time_steps; ++time_step )
+    {
+      auto counter = 0u;
+      for ( const auto& trace : traces )
+        values_in_current_time_step[counter++] = trace[time_step];
+
+      fn( values_in_current_time_step, time_step );
+    }
+  }
+
 protected:
   std::map<std::string,uint32_t> name_to_index;
   std::vector<std::vector<bool>> traces;
