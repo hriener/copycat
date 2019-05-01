@@ -240,11 +240,12 @@ public:
   {
     const auto index = node( storage->nodes.size() );
     auto& node = storage->nodes.emplace_back();
-    node.children[0].data = ltl_operator::Variable;
-    node.children[1].data = storage->inputs.size();
+    node.data[0] = ltl_operator::Variable;
+    node.data[1] = storage->inputs.size();
+
     storage->inputs.emplace_back( index );
     ++storage->num_pis;
-    return {index, 0};
+    return {index,0};
   }
 
   ltl_formula create_or( ltl_formula a, ltl_formula b )
@@ -349,32 +350,44 @@ public:
 
     return {index,0};
   }
+
+  ltl_formula create_eventually( ltl_formula const &a )
+  {
+    /* F(a) = (true)U(a) */
+    return create_until( get_constant( true ), a );
+  }
+
+  ltl_formula create_globally( ltl_formula const& a )
+  {
+    /* G(a) = !F(!(a)) */
+    return !create_eventually( !a );
+  }
   
   bool is_constant( node const& n ) const
   {
-    assert( storage->nodes[0].children[0].data == ltl_operator::Constant );
+    assert( storage->nodes[0].data[0] == ltl_operator::Constant );
     return n == 0;
   }
 
   bool is_variable( node const& n ) const
   {
-    return storage->nodes[n].children[0].data == ltl_operator::Variable &&
-           storage->nodes[n].children[1].data < static_cast<uint32_t>(storage->num_pis);
+    return storage->nodes[n].data[0] == ltl_operator::Variable &&
+           storage->nodes[n].data[1] < static_cast<uint32_t>(storage->num_pis);
   }
 
   bool is_or( node const& n ) const
   {
-    return storage->nodes[n].children[0].data == ltl_operator::Or;
+    return storage->nodes[n].data[0] == ltl_operator::Or;
   }
   
   bool is_next( node const& n ) const
   {
-    return storage->nodes[n].children[0].data == ltl_operator::Next;
+    return storage->nodes[n].data[0] == ltl_operator::Next;
   }
 
   bool is_until( node const& n ) const
   {
-    return storage->nodes[n].children[0].data == ltl_operator::Until;
+    return storage->nodes[n].data[0] == ltl_operator::Until;
   }
 
   node get_node( ltl_formula const& f ) const

@@ -9,6 +9,7 @@ TEST_CASE( "Constant", "[ltl]" )
   CHECK( store.get_constant( false ) !=  store.get_constant( true ) );
   CHECK( store.get_constant( false ) == !store.get_constant( true ) );
   CHECK( store.is_constant( store.get_node( store.get_constant( false ) ) ) );
+  CHECK( store.is_constant( store.get_node( store.get_constant( true ) ) ) );
   CHECK( store.get_node( store.get_constant( false ) ) ==
          store.get_node( store.get_constant( true ) ) );
   CHECK( !store.is_complemented( store.get_constant( false ) ) );
@@ -20,6 +21,10 @@ TEST_CASE( "Variable", "[ltl]" )
   ltl_formula_store store;
   auto const a = store.create_variable();
   auto const b = store.create_variable();
+  CHECK( store.is_variable( store.get_node(  a ) ) );
+  CHECK( store.is_variable( store.get_node(  b ) ) );
+  CHECK( store.is_variable( store.get_node( !a ) ) );
+  CHECK( store.is_variable( store.get_node( !b ) ) );
   CHECK( a != b );
   CHECK( !store.is_complemented( a ) );
   CHECK( !store.is_complemented( b ) );
@@ -53,7 +58,9 @@ TEST_CASE( "Next", "[ltl]" )
   CHECK( store.create_next( store.get_constant( true ) ) == store.get_constant( true ) );
   CHECK( store.create_next( store.get_constant( false ) ) == store.get_constant( false ) );
 
-  CHECK( store.create_next( a ) != a );
+  auto const Xa = store.create_next( a );
+  CHECK( Xa != a );
+  CHECK( store.is_next( store.get_node( Xa ) ) );
 }
 
 TEST_CASE( "Until", "[ltl]" )
@@ -62,6 +69,11 @@ TEST_CASE( "Until", "[ltl]" )
   auto const a = store.create_variable();
   auto const b = store.create_variable();
 
+  auto const aUb = store.create_until( a, b );
+  auto const bUa = store.create_until( b, a );
+  CHECK( store.is_until( store.get_node( aUb ) ) );
+  CHECK( store.is_until( store.get_node( bUa ) ) );
+
   // anti-symmetry
-  CHECK( store.create_until( a, b ) != store.create_until( b, a ) );
+  CHECK( aUb != bUa );
 }
