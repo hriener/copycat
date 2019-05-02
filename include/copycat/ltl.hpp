@@ -42,17 +42,17 @@ namespace copycat
 enum ltl_operator
 {
   Constant = 0,
-  Variable,
-  Or,
-  Next,
-  Until
+  Variable = 1,
+  Or = 2,
+  Next = 3,
+  Until = 4,
 }; /* ltl_operator */
 
 class ltl_node_pointer
 {
 public:
   using internal_type = uint32_t;
-  
+
   ltl_node_pointer() = default;
   ltl_node_pointer( uint32_t index, uint32_t weight )
     : weight( weight )
@@ -105,7 +105,7 @@ struct hash<copycat::ltl_node>
     seed += node.children[1u].index * 2971;
     seed += node.children[0u].weight * 911;
     seed += node.children[1u].weight * 353;
-    return seed;    
+    return seed;
   }
 };
 
@@ -148,7 +148,7 @@ class ltl_formula_store
 {
 public:
   using node = uint32_t;
-  
+
   struct ltl_formula
   {
     ltl_formula() = default;
@@ -169,7 +169,7 @@ public:
       , index( p.index )
     {
     }
-    
+
     union {
       struct
       {
@@ -264,7 +264,7 @@ public:
     else if ( a.index == 0 )
     {
       return a.complement ? get_constant( true ) : b;
-    }    
+    }
 
     ltl_storage::node_type n;
     n.children[0] = a;
@@ -277,7 +277,7 @@ public:
     {
       return {it->second, 0};
     }
-    
+
     const auto index = node( storage->nodes.size() );
     if ( index >= .9 * storage->nodes.capacity() )
     {
@@ -297,7 +297,7 @@ public:
     if ( a.index == 0 )
     {
       return a.complement ? get_constant( true ) : get_constant( false );
-    }    
+    }
 
     ltl_storage::node_type n;
     n.children[0] = a;
@@ -310,7 +310,7 @@ public:
     {
       return {it->second, 0};
     }
-    
+
     const auto index = node( storage->nodes.size() );
     if ( index >= .9 * storage->nodes.capacity() )
     {
@@ -337,7 +337,7 @@ public:
     {
       return {it->second, 0};
     }
-    
+
     const auto index = node( storage->nodes.size() );
     if ( index >= .9 * storage->nodes.capacity() )
     {
@@ -362,7 +362,7 @@ public:
     /* G(a) = !F(!(a)) */
     return !create_eventually( !a );
   }
-  
+
   bool is_constant( node const& n ) const
   {
     assert( storage->nodes[0].data[0] == ltl_operator::Constant );
@@ -379,7 +379,7 @@ public:
   {
     return storage->nodes[n].data[0] == ltl_operator::Or;
   }
-  
+
   bool is_next( node const& n ) const
   {
     return storage->nodes[n].data[0] == ltl_operator::Next;
@@ -413,6 +413,15 @@ public:
   node index_to_node( uint32_t index ) const
   {
     return index;
+  }
+
+  template<typename Fn>
+  void foreach_fanin( node const& n, Fn&& fn ) const
+  {
+    for ( auto i = 0u; i < 2u; ++i )
+    {
+      fn( ltl_formula{storage->nodes[n].children[i]}, i );
+    }
   }
 
 protected:
