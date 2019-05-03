@@ -40,25 +40,27 @@
 namespace copycat
 {
 
-/*! \brief Abstract template class for ltl_evaluator. */
+/*! \brief Abstract class for default_ltl_evaluator. */
 class default_ltl_evaluator
 {
 public:
   using result_type = void;
 
 public:
-  default_ltl_evaluator() = delete;
+  explicit default_ltl_evaluator() = delete;
 }; /* default_ltl_evaluator */
 
+/*! \brief LTL evaluator for finite traces using three-valued logic */
 class ltl_finite_trace_evaluator
 {
 public:
   using formula = ltl_formula_store::ltl_formula;
   using node = ltl_formula_store::node;
+
   using result_type = bool3;
 
 public:
-  ltl_finite_trace_evaluator( ltl_formula_store& ltl )
+  explicit ltl_finite_trace_evaluator( ltl_formula_store& ltl )
     : ltl( ltl )
   {
   }
@@ -74,7 +76,6 @@ public:
     }
 
     assert( !ltl.is_complemented( f ) );
-
     auto const n = ltl.get_node( f );
 
     /* constant */
@@ -109,6 +110,7 @@ public:
     }
   }
 
+protected:
   bool3 evaluate_constant( node const& n ) const
   {
     assert( ltl.is_constant( n ) && n == 0 );
@@ -129,6 +131,7 @@ public:
     ltl.foreach_fanin( n, [&]( const auto& formula, uint32_t index ) {
         subformulas[index] = formula;
       });
+
     return evaluate_formula( subformulas[0], t, pos ) || evaluate_formula( subformulas[1], t, pos );
   }
 
