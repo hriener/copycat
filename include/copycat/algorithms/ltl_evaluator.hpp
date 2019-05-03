@@ -34,117 +34,11 @@
 
 #include "../ltl.hpp"
 #include "../trace.hpp"
+#include "../logic/bool3.hpp"
 #include <iostream>
 
 namespace copycat
 {
-
-struct indeterminate_t {};
-struct presumably_true_t {};
-struct presumably_false_t {};
-
-class bool3
-{
-public:
-  bool3()
-    : value( false_value )
-  {
-  }
-
-  bool3( bool b )
-    : value( b ? true_value : false_value )
-  {
-  }
-
-  explicit bool3( indeterminate_t const& )
-    : value( indeterminate_value )
-  {
-  }
-
-  bool operator==( bool3 const& other ) const
-  {
-    return value == other.value;
-  }
-
-  bool operator!=( bool3 const& other ) const
-  {
-    return !this->operator==( other );
-  }
-
-  bool operator<( bool3 const& other ) const
-  {
-    return value < other.value;
-  }
-
-  bool operator>( bool3 const& other ) const
-  {
-    return value > other.value;
-  }
-
-  bool operator<=( bool3 const& other ) const
-  {
-    return !operator>( other );
-  }
-
-  bool operator>=( bool3 const& other ) const
-  {
-    return !operator<( other );
-  }
-
-  bool3 operator!() const
-  {
-    switch ( value )
-    {
-    default:
-      std::cerr << "[e] unsupported value" << std::endl;
-    case indeterminate_value:
-      return bool3(indeterminate_t());
-    case false_value:
-      return true;
-    case true_value:
-      return false;
-    }
-  }
-
-  bool is_false() const
-  {
-    return ( value == false_value );
-  }
-
-  bool is_true() const
-  {
-    return ( value == true_value );
-  }
-
-  bool is_indeterminate() const
-  {
-    return ( value == indeterminate_value );
-  }
-
-  std::string to_string() const
-  {
-    switch ( value )
-    {
-    default:
-      std::cerr << "[e] unsupported value" << std::endl;
-    case indeterminate_value:
-      return "?";
-    case false_value:
-      return "0";
-    case true_value:
-      return "1";
-    }
-  }
-
-protected:
-  enum value_t {
-    false_value = -1,
-    indeterminate_value = 0,
-    true_value = 1,
-  } value;
-}; /* bool3 */
-
-inline bool3 indeterminate{indeterminate_t()};
 
 class ltl_evaluator
 {
@@ -177,7 +71,6 @@ public:
     }
     else if ( store.is_or( n ) )
     {
-      assert( !store.is_complemented( f ) );
       std::array<formula,2> subformulas;
       store.foreach_fanin( n, [&]( const auto& formula, uint32_t index ) {
           subformulas[index] = formula;
@@ -186,17 +79,14 @@ public:
     }
     else if ( store.is_next( n ) )
     {
-      assert( !store.is_complemented( f ) );
       return eval_next( n, t, pos );
     }
     else if ( store.is_until( n ) )
     {
-      assert( !store.is_complemented( f ) );
       std::array<formula,2> subformulas;
       store.foreach_fanin( n, [&]( const auto& formula, uint32_t index ) {
           subformulas[index] = formula;
         });
-
       return eval_until( subformulas[0], subformulas[1], t, pos );
     }
     else
@@ -215,9 +105,8 @@ public:
   bool3 eval_variable( ltl_formula_store::node const& n, trace const& t, uint32_t pos )
   {
     if ( pos >= t.length() )
-    {
       return indeterminate;
-    }
+
     return t.has( pos, n );
   }
 
@@ -228,7 +117,7 @@ public:
       return true;
 
     bool3 result_b = eval( b, t, pos );
-    return std::max( result_a, result_b );
+    return ( result_a | result_b );
   }
 
   bool3 eval_next( ltl_formula_store::node const& n, trace const& t, uint32_t pos )
@@ -258,7 +147,7 @@ public:
       return false;
 
     bool3 const result_next = eval_until( a, b, t, pos+1 );
-    return std::max( result_b, std::min( result_a, result_next ) );
+    return ( result_b | ( result_a & result_next ) );
   }
 
 protected:
