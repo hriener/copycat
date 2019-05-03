@@ -106,9 +106,25 @@ public:
     return std::min( *this, other );
   }
 
+  bool3 operator&&( bool3 const& other ) const
+  {
+    if ( is_false() )
+      return false;
+
+    return ( *this & other );
+  }
+
   bool3 operator|( bool3 const& other ) const
   {
     return std::max( *this, other );
+  }
+
+  bool3 operator||( bool3 const& other ) const
+  {
+    if ( is_true() )
+      return true;
+
+    return ( *this | other );
   }
 
   bool is_false() const

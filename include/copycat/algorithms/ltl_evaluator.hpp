@@ -40,54 +40,67 @@
 namespace copycat
 {
 
-class ltl_evaluator
+/*! \brief Abstract template class for ltl_evaluator. */
+class default_ltl_evaluator
+{
+public:
+  using result_type = void;
+
+public:
+  default_ltl_evaluator() = delete;
+}; /* default_ltl_evaluator */
+
+class ltl_finite_trace_evaluator
 {
 public:
   using formula = ltl_formula_store::ltl_formula;
+  using node = ltl_formula_store::node;
+  using result_type = bool3;
 
 public:
-  explicit ltl_evaluator( ltl_formula_store const& store )
-    : store( store )
+  ltl_finite_trace_evaluator( ltl_formula_store& ltl )
+    : ltl( ltl )
   {
   }
 
-  bool3 eval( formula const& f, trace const& t, uint32_t pos = 0 )
+  bool3 evaluate_formula( formula const& f, trace const& t, uint32_t pos ) const
   {
-    if ( store.is_complemented( f ) )
+    assert( t.is_finite() && "finite trace evaluator only looks at the prefix of the trace" );
+
+    /* negation */
+    if ( ltl.is_complemented( f ) )
     {
-      return !( eval( !f, t, pos ) );
+      return !evaluate_formula( !f, t, pos );
     }
 
-    assert( !store.is_complemented( f ) );
+    assert( !ltl.is_complemented( f ) );
 
-    auto const n = store.get_node( f );
-    if ( store.is_constant( n ) )
+    auto const n = ltl.get_node( f );
+
+    /* constant */
+    if ( ltl.is_constant( n ) )
     {
-      return eval_constant( n );
+      return evaluate_constant( n );
     }
-    else if ( store.is_variable( n ) )
+    /* variable */
+    else if ( ltl.is_variable( n ) )
     {
-      return eval_variable( n, t, pos );
+      return evaluate_variable( n, t, pos );
     }
-    else if ( store.is_or( n ) )
+    /* or */
+    else if ( ltl.is_or( n ) )
     {
-      std::array<formula,2> subformulas;
-      store.foreach_fanin( n, [&]( const auto& formula, uint32_t index ) {
-          subformulas[index] = formula;
-        });
-      return eval_or( subformulas[0], subformulas[1], t, pos );
+      return evaluate_or( n, t, pos );
     }
-    else if ( store.is_next( n ) )
+    /* next */
+    else if ( ltl.is_next( n ) )
     {
-      return eval_next( n, t, pos );
+      return evaluate_next( n, t, pos );
     }
-    else if ( store.is_until( n ) )
+    /* until */
+    else if ( ltl.is_until( n ) )
     {
-      std::array<formula,2> subformulas;
-      store.foreach_fanin( n, [&]( const auto& formula, uint32_t index ) {
-          subformulas[index] = formula;
-        });
-      return eval_until( subformulas[0], subformulas[1], t, pos );
+      return evaluate_until( n, t, pos );
     }
     else
     {
@@ -96,13 +109,13 @@ public:
     }
   }
 
-  bool3 eval_constant( ltl_formula_store::node const& n )
+  bool3 evaluate_constant( node const& n ) const
   {
-    assert( store.is_constant( n ) && n == 0 );
+    assert( ltl.is_constant( n ) && n == 0 );
     return false;
   }
 
-  bool3 eval_variable( ltl_formula_store::node const& n, trace const& t, uint32_t pos )
+  bool3 evaluate_variable( node const& n, trace const& t, uint32_t pos ) const
   {
     if ( pos >= t.length() )
       return indeterminate;
@@ -110,48 +123,50 @@ public:
     return t.has( pos, n );
   }
 
-  bool3 eval_or( formula const& a, formula const& b, trace const& t, uint32_t pos )
+  bool3 evaluate_or( node const& n, trace const& t, uint32_t pos ) const
   {
-    bool3 result_a = eval( a, t, pos );
-    if ( result_a.is_true() )
-      return true;
-
-    bool3 result_b = eval( b, t, pos );
-    return ( result_a | result_b );
+    std::array<formula,2> subformulas;
+    ltl.foreach_fanin( n, [&]( const auto& formula, uint32_t index ) {
+        subformulas[index] = formula;
+      });
+    return evaluate_formula( subformulas[0], t, pos ) || evaluate_formula( subformulas[1], t, pos );
   }
 
-  bool3 eval_next( ltl_formula_store::node const& n, trace const& t, uint32_t pos )
+  bool3 evaluate_next( node const& n, trace const& t, uint32_t pos ) const
   {
     if ( pos+1 >= t.length() )
       return indeterminate;
 
     std::array<formula,2> subformulas;
-    store.foreach_fanin( n, [&]( const auto& formula, uint32_t index ) {
+    ltl.foreach_fanin( n, [&]( const auto& formula, uint32_t index ) {
         subformulas[index] = formula;
       });
 
-    return eval( subformulas[0], t, pos+1 );
+    return evaluate_formula( subformulas[0], t, pos+1 );
   }
 
-  bool3 eval_until( formula const& a, formula const& b, trace const& t, uint32_t pos )
+  bool3 evaluate_until( node const& n, trace const& t, uint32_t pos ) const
   {
     if ( pos+1 >= t.length() )
       return indeterminate;
 
-    bool3 const result_b = eval( b, t, pos );
-    if ( result_b.is_true() )
-      return true;
+    std::array<formula,2> subformulas;
+    ltl.foreach_fanin( n, [&]( const auto& formula, uint32_t index ) {
+        subformulas[index] = formula;
+      });
 
-    bool3 const result_a = eval( a, t, pos );
-    if ( result_a.is_false() )
-      return false;
-
-    bool3 const result_next = eval_until( a, b, t, pos+1 );
-    return ( result_b | ( result_a & result_next ) );
+    return evaluate_formula( subformulas[1], t, pos ) ||
+      ( evaluate_formula( subformulas[0], t, pos ) && evaluate_until( n, t, pos+1 ) );
   }
 
 protected:
-  ltl_formula_store const& store;
-}; /* ltl_evaluator */
+  ltl_formula_store& ltl;
+}; /* evaluator */
+
+template<class Evaluator = default_ltl_evaluator>
+typename Evaluator::result_type evaluate( ltl_formula_store::ltl_formula const& f, trace const& t, Evaluator const& eval = Evaluator() )
+{
+  return eval.evaluate_formula( f, t, 0 );
+}
 
 } /* namespace copycat */
