@@ -24,8 +24,8 @@
  */
 
 /*!
-  \file bool3.hpp
-  \brief Three-valued Boolean
+  \file bool5.hpp
+  \brief Five-valued Boolean
 
   \author Heinz Riener
 */
@@ -37,94 +37,120 @@
 namespace copycat
 {
 
-class bool3
+class bool5
 {
 public:
+  struct presumably_false_t {};
   struct indeterminate_t {};
+  struct presumably_true_t {};
 
 public:
-  bool3()
+  bool5()
     : value( false_value )
   {
   }
 
-  bool3( bool b )
+  bool5( bool b )
     : value( b ? true_value : false_value )
   {
   }
 
-  explicit bool3( indeterminate_t const& )
+  explicit bool5( presumably_false_t const& )
+    : value( presumably_false_value )
+  {
+  }
+
+  explicit bool5( indeterminate_t const& )
     : value( indeterminate_value )
   {
   }
 
-  bool operator==( bool3 const& other ) const
+  explicit bool5( presumably_true_t const& )
+    : value( presumably_true_value )
+  {
+  }
+  
+  bool operator==( bool5 const& other ) const
   {
     return value == other.value;
   }
 
-  bool operator!=( bool3 const& other ) const
+  bool operator!=( bool5 const& other ) const
   {
     return !this->operator==( other );
   }
 
-  bool operator<( bool3 const& other ) const
+  bool operator<( bool5 const& other ) const
   {
     return value < other.value;
   }
 
-  bool operator>( bool3 const& other ) const
+  bool operator>( bool5 const& other ) const
   {
     return value > other.value;
   }
 
-  bool operator<=( bool3 const& other ) const
+  bool operator<=( bool5 const& other ) const
   {
     return !operator>( other );
   }
 
-  bool operator>=( bool3 const& other ) const
+  bool operator>=( bool5 const& other ) const
   {
     return !operator<( other );
   }
 
-  bool3 operator!() const
+  bool5 operator!() const
   {
     switch ( value )
     {
     default:
-    case indeterminate_value:
-      return bool3(indeterminate_t());
     case false_value:
       return true;
+    case presumably_false_value:
+      return bool5(presumably_true_t());      
+    case indeterminate_value:
+      return bool5(indeterminate_t());
+    case presumably_true_value:
+      return bool5(presumably_false_t());
     case true_value:
       return false;
     }
   }
 
-  bool3 operator&( bool3 const& other ) const
+  bool5 operator&( bool5 const& other ) const
   {
     return std::min( *this, other );
   }
 
-  bool3 operator&&( bool3 const& other ) const
+  bool5 operator&&( bool5 const& other ) const
   {
     if ( is_false() )
+    {
       return false;
-
+    }
+    else if ( is_presumably_false() )
+    {
+      return bool5( presumably_false_t() );
+    }
     return ( *this & other );
   }
 
-  bool3 operator|( bool3 const& other ) const
+  bool5 operator|( bool5 const& other ) const
   {
     return std::max( *this, other );
   }
 
-  bool3 operator||( bool3 const& other ) const
+  bool5 operator||( bool5 const& other ) const
   {
     if ( is_true() )
+    {
       return true;
-
+    }
+    else if ( is_presumably_true() )
+    {
+      return bool5( presumably_true_t() );
+    }
     return ( *this | other );
   }
 
@@ -133,14 +159,24 @@ public:
     return ( value == false_value );
   }
 
-  bool is_true() const
+  bool is_presumably_false() const
   {
-    return ( value == true_value );
+    return ( value == presumably_false_value );
   }
 
   bool is_indeterminate() const
   {
     return ( value == indeterminate_value );
+  }
+
+  bool is_presumably_true() const
+  {
+    return ( value == presumably_true_value );
+  }
+  
+  bool is_true() const
+  {
+    return ( value == true_value );
   }
 
   std::string to_string() const
@@ -150,21 +186,29 @@ public:
     default:
     case indeterminate_value:
       return "?";
-    case false_value:
-      return "0";
     case true_value:
-      return "1";
+      return "H";
+    case presumably_true_value:
+      return "h";
+    case presumably_false_value:
+      return "l";
+    case false_value:
+      return "L";
     }
   }
 
 protected:
   enum value_t {
-    false_value = -1,
-    indeterminate_value = 0,
-    true_value = 1,
+    false_value = 0,
+    presumably_false_value = 1,
+    indeterminate_value = 2,
+    presumably_true_value = 3,
+    true_value = 4,
   } value;
-}; /* bool3 */
+}; /* bool5 */
 
-inline bool3 indeterminate3{bool3::indeterminate_t()};
+inline bool5 presumably_true{bool5::presumably_true_t()};
+inline bool5 indeterminate5{bool5::indeterminate_t()};
+inline bool5 presumably_false{bool5::presumably_false_t()};
 
 } /* namespace copycat */
