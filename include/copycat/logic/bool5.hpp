@@ -41,7 +41,7 @@ class bool5
 {
 public:
   struct presumably_false_t {};
-  struct indeterminate_t {};
+  struct inconclusive_t {};
   struct presumably_true_t {};
 
 public:
@@ -60,8 +60,8 @@ public:
   {
   }
 
-  explicit bool5( indeterminate_t const& )
-    : value( indeterminate_value )
+  explicit bool5( inconclusive_t const& )
+    : value( inconclusive_value )
   {
   }
 
@@ -109,8 +109,8 @@ public:
       return true;
     case presumably_false_value:
       return bool5(presumably_true_t());      
-    case indeterminate_value:
-      return bool5(indeterminate_t());
+    case inconclusive_value:
+      return bool5(inconclusive_t());
     case presumably_true_value:
       return bool5(presumably_false_t());
     case true_value:
@@ -164,9 +164,9 @@ public:
     return ( value == presumably_false_value );
   }
 
-  bool is_indeterminate() const
+  bool is_inconclusive() const
   {
-    return ( value == indeterminate_value );
+    return ( value == inconclusive_value );
   }
 
   bool is_presumably_true() const
@@ -184,7 +184,7 @@ public:
     switch ( value )
     {
     default:
-    case indeterminate_value:
+    case inconclusive_value:
       return "?";
     case true_value:
       return "H";
@@ -201,14 +201,14 @@ protected:
   enum value_t {
     false_value = 0,
     presumably_false_value = 1,
-    indeterminate_value = 2,
+    inconclusive_value = 2,
     presumably_true_value = 3,
     true_value = 4,
   } value;
 }; /* bool5 */
 
 inline bool5 presumably_true{bool5::presumably_true_t()};
-inline bool5 indeterminate5{bool5::indeterminate_t()};
+inline bool5 inconclusive5{bool5::inconclusive_t()};
 inline bool5 presumably_false{bool5::presumably_false_t()};
 
 } /* namespace copycat */

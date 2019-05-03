@@ -33,6 +33,6 @@ TEST_CASE( "Evaluate LTL", "[ltl_evaluator]" )
     store.create_globally(  store.create_or( !request, store.create_eventually( grant ) ) );
 
   ltl_finite_trace_evaluator eval( store );
-  CHECK( evaluate<ltl_finite_trace_evaluator>( property, t0, eval ).is_indeterminate() );
-  CHECK( evaluate<ltl_finite_trace_evaluator>( property, t1, eval ).is_indeterminate() );
+  CHECK( evaluate<ltl_finite_trace_evaluator>( property, t0, eval ).is_inconclusive() );
+  CHECK( evaluate<ltl_finite_trace_evaluator>( property, t1, eval ).is_inconclusive() );
 }

@@ -40,7 +40,7 @@ namespace copycat
 class bool3
 {
 public:
-  struct indeterminate_t {};
+  struct inconclusive_t {};
 
 public:
   bool3()
@@ -53,8 +53,8 @@ public:
   {
   }
 
-  explicit bool3( indeterminate_t const& )
-    : value( indeterminate_value )
+  explicit bool3( inconclusive_t const& )
+    : value( inconclusive_value )
   {
   }
 
@@ -93,8 +93,8 @@ public:
     switch ( value )
     {
     default:
-    case indeterminate_value:
-      return bool3(indeterminate_t());
+    case inconclusive_value:
+      return bool3(inconclusive_t());
     case false_value:
       return true;
     case true_value:
@@ -138,9 +138,9 @@ public:
     return ( value == true_value );
   }
 
-  bool is_indeterminate() const
+  bool is_inconclusive() const
   {
-    return ( value == indeterminate_value );
+    return ( value == inconclusive_value );
   }
 
   std::string to_string() const
@@ -148,7 +148,7 @@ public:
     switch ( value )
     {
     default:
-    case indeterminate_value:
+    case inconclusive_value:
       return "?";
     case false_value:
       return "0";
@@ -160,11 +160,11 @@ public:
 protected:
   enum value_t {
     false_value = -1,
-    indeterminate_value = 0,
+    inconclusive_value = 0,
     true_value = 1,
   } value;
 }; /* bool3 */
 
-inline bool3 indeterminate3{bool3::indeterminate_t()};
+inline bool3 inconclusive3{bool3::inconclusive_t()};
 
 } /* namespace copycat */

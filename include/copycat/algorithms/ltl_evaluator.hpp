@@ -106,7 +106,7 @@ public:
     else
     {
       std::cerr << "[e] unknown operator" << std::endl;
-      return indeterminate3;
+      return inconclusive3;
     }
   }
 
@@ -120,7 +120,7 @@ protected:
   bool3 evaluate_variable( node const& n, trace const& t, uint32_t pos ) const
   {
     if ( pos >= t.length() )
-      return indeterminate3;
+      return inconclusive3;
 
     return t.has( pos, n );
   }
@@ -138,7 +138,7 @@ protected:
   bool3 evaluate_next( node const& n, trace const& t, uint32_t pos ) const
   {
     if ( pos+1 >= t.length() )
-      return indeterminate3;
+      return inconclusive3;
 
     std::array<formula,2> subformulas;
     ltl.foreach_fanin( n, [&]( const auto& formula, uint32_t index ) {
@@ -151,7 +151,7 @@ protected:
   bool3 evaluate_until( node const& n, trace const& t, uint32_t pos ) const
   {
     if ( pos+1 >= t.length() )
-      return indeterminate3;
+      return inconclusive3;
 
     std::array<formula,2> subformulas;
     ltl.foreach_fanin( n, [&]( const auto& formula, uint32_t index ) {
