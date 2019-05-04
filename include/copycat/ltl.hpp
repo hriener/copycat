@@ -45,7 +45,8 @@ enum ltl_operator
   Variable = 1,
   Or = 2,
   Next = 3,
-  Until = 4,
+  Eventually = 4,
+  Until = 5,
 }; /* ltl_operator */
 
 class ltl_node_pointer
@@ -353,6 +354,39 @@ public:
 
   ltl_formula create_eventually( ltl_formula const &a )
   {
+    /* trivial cases */
+    if ( a.index == 0 )
+    {
+      return a.complement ? get_constant( true ) : get_constant( false );
+    }
+
+    ltl_storage::node_type n;
+    n.children[0] = a;
+    n.children[1] = {0,0};
+    n.data[0] = ltl_operator::Eventually;
+    n.data[1] = 0;
+
+    const auto it = storage->hash.find( n );
+    if ( it != std::end( storage->hash ) )
+    {
+      return {it->second, 0};
+    }
+
+    const auto index = node( storage->nodes.size() );
+    if ( index >= .9 * storage->nodes.capacity() )
+    {
+      storage->nodes.reserve( uint32_t( 3.1415f * index ) );
+      storage->hash.reserve( uint32_t( 3.1415f * index ) );
+    }
+
+    storage->nodes.push_back( n );
+    storage->hash[n] = index;
+
+    return {index,0};
+  }
+
+  ltl_formula eventually( ltl_formula const &a )
+  {
     /* F(a) = (true)U(a) */
     return create_until( get_constant( true ), a );
   }
@@ -361,6 +395,12 @@ public:
   {
     /* G(a) = !F(!(a)) */
     return !create_eventually( !a );
+  }
+
+  ltl_formula globally( ltl_formula const& a )
+  {
+    /* G(a) = !F(!(a)) */
+    return !eventually( !a );
   }
 
   bool is_constant( node const& n ) const
@@ -383,6 +423,11 @@ public:
   bool is_next( node const& n ) const
   {
     return storage->nodes[n].data[0] == ltl_operator::Next;
+  }
+
+  bool is_eventually( node const& n ) const
+  {
+    return storage->nodes[n].data[0] == ltl_operator::Eventually;
   }
 
   bool is_until( node const& n ) const
