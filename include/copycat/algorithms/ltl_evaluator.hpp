@@ -35,6 +35,7 @@
 #include "../ltl.hpp"
 #include "../trace.hpp"
 #include "../logic/bool3.hpp"
+#include "../utils/extended_inttype.hpp"
 #include <iostream>
 
 namespace copycat
