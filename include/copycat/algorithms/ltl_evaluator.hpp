@@ -104,6 +104,10 @@ public:
     {
       return evaluate_until( n, t, pos );
     }
+    else if ( ltl.is_eventually( n ) )
+    {
+      assert( false && "not implemented" );
+    }
     else
     {
       std::cerr << "[e] unknown operator" << std::endl;
@@ -165,7 +169,7 @@ protected:
 
 protected:
   ltl_formula_store& ltl;
-}; /* evaluator */
+}; /* ltl_finite_trace_evaluator */
 
 template<class Evaluator = default_ltl_evaluator>
 typename Evaluator::result_type evaluate( ltl_formula_store::ltl_formula const& f, trace const& t, Evaluator const& eval = Evaluator() )

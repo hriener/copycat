@@ -45,7 +45,7 @@ TEST_CASE( "Or", "[ltl]" )
   // symmetry
   CHECK( store.create_or( a, b ) == store.create_or( b, a ) );
 
-  // trashing
+  // strashing
   CHECK( store.create_or( store.create_or( a, b ), c ) == store.create_or( c, store.create_or( a, b ) ) );
 }
 
@@ -59,8 +59,9 @@ TEST_CASE( "Next", "[ltl]" )
   CHECK( store.create_next( store.get_constant( false ) ) == store.get_constant( false ) );
 
   auto const Xa = store.create_next( a );
-  CHECK( Xa != a );
   CHECK( store.is_next( store.get_node( Xa ) ) );
+
+  CHECK( Xa != a );
 }
 
 TEST_CASE( "Until", "[ltl]" )

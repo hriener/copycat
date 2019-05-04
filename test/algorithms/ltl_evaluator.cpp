@@ -30,7 +30,7 @@ TEST_CASE( "Evaluate LTL", "[ltl_evaluator]" )
 
   /* G( request --> F( grant ) ) */
   auto const property =
-    store.create_globally(  store.create_or( !request, store.create_eventually( grant ) ) );
+    store.globally(  store.create_or( !request, store.eventually( grant ) ) );
 
   ltl_finite_trace_evaluator eval( store );
   CHECK( evaluate<ltl_finite_trace_evaluator>( property, t0, eval ).is_inconclusive() );
