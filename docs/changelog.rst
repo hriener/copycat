@@ -21,3 +21,6 @@ v0.1 (Not yet released)
 * Utils:
   - Three-valued Boolean (`bool3`)
   - Five-valued Boolean (`bool5`)
+
+* IO:
+  - LTL reader (`ltl_reader`)
