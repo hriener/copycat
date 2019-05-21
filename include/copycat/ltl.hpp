@@ -32,9 +32,10 @@
 
 #pragma once
 
-#include <unordered_map>
 #include <array>
 #include <memory>
+#include <unordered_map>
+#include <vector>
 
 namespace copycat
 {
