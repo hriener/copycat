@@ -11,16 +11,16 @@ v0.1 (Not yet released)
   - Waveform (`waveform`)
   - Finite or infinite trace (`trace`)
 
-* Generators:
+* Generators
   - Waveform generator (`waveform_generator`)
 
-* Algorithms:
+* Algorithms
   - Sequential simulator (`sequential_simulation`)
   - LTL evaluation on finite traces (`ltl_finite_trace_evaluator`)
 
-* Utils:
+* Utils
   - Three-valued Boolean (`bool3`)
   - Five-valued Boolean (`bool5`)
 
-* IO:
+* IO
   - LTL reader (`ltl_reader`)
