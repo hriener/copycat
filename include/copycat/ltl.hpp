@@ -233,6 +233,16 @@ public:
   {
   }
 
+  uint32_t num_variables() const
+  {
+    return storage->inputs.size();
+  }
+
+  uint32_t num_formulas() const
+  {
+    return storage->outputs.size();
+  }
+
   ltl_formula get_constant( bool value ) const
   {
     return {0, static_cast<uint32_t>( value ? 1 : 0 ) };
@@ -248,6 +258,11 @@ public:
     storage->inputs.emplace_back( index );
     ++storage->num_pis;
     return {index,0};
+  }
+
+  void create_formula( ltl_formula const& a )
+  {
+    storage->outputs.push_back( a );
   }
 
   ltl_formula create_or( ltl_formula a, ltl_formula b )
