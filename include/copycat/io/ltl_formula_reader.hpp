@@ -41,8 +41,10 @@ namespace copycat
 class ltl_formula_reader : public ltl_reader
 {
 public:
-  explicit ltl_formula_reader( ltl_formula_store& ltl )
+  explicit ltl_formula_reader( ltl_formula_store& ltl,
+                               std::map<std::string, ltl_formula_store::ltl_formula>& names )
     : _ltl( ltl )
+    , _names( names )
   {
   }
 
@@ -51,12 +53,16 @@ public:
     if ( formula.size() <= id )
       formula.resize( id+1 );
 
-    auto const it = names.find( name );
-    if ( it == names.end() )
+    auto const it = _names.find( name );
+    if ( it == _names.end() )
     {
       auto const var = _ltl.create_variable();
       formula[id] = var;
-      names.emplace( name, id );
+      _names.emplace( name, var );
+    }
+    else
+    {
+      formula[id] = it->second;
     }
   }
 
@@ -129,7 +135,7 @@ public:
 
 protected:
   ltl_formula_store& _ltl;
-  mutable std::map<std::string, uint32_t> names;
+  std::map<std::string, ltl_formula_store::ltl_formula>& _names;
   mutable std::vector<ltl_formula_store::ltl_formula> formula;
 }; /* ltl_formula_reader */
 
