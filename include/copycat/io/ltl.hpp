@@ -483,6 +483,11 @@ public:
     (void)child0_id;
     (void)child1_id;
   }
+
+  virtual void on_formula( uint32_t id ) const
+  {
+    (void)id;
+  }
 }; /* ltl_reader */
 
 class ltl_pretty_printer : public copycat::ltl_reader
@@ -503,6 +508,11 @@ public:
   void on_binary_op( uint32_t id, std::string const& op, uint32_t child0_id, uint32_t child1_id ) const override
   {
     std::cout << id << " := " << op << ' ' << child0_id << ' ' << child1_id << std::endl;
+  }
+
+  void on_formula( uint32_t id ) const override
+  {
+    std::cout << "FORMULA( " << id << " )" << std::endl;
   }
 }; /* ltl_pretty_printer */
 
@@ -526,6 +536,12 @@ public:
 
   void operator()( ast_id const& n )
   {
+    apply_recursive( n );
+    _reader.on_formula( n );
+  }
+
+  void apply_recursive( ast_id const& n )
+  {
     auto const num_children = _ast_store.num_children( n );
     switch ( num_children )
     {
@@ -533,12 +549,12 @@ public:
       _reader.on_proposition( n, _ast_store.get_data( n ).lexem );
       break;
     case 1u:
-      this->operator()( _ast_store.get_child( n, 0u ) );
+      apply_recursive( _ast_store.get_child( n, 0u ) );
       _reader.on_unary_op( n, _ast_store.get_data( n ).lexem, _ast_store.get_child( n, 0u ) );
       break;
     case 2u:
-      this->operator()( _ast_store.get_child( n, 0u ) );
-      this->operator()( _ast_store.get_child( n, 1u ) );
+      apply_recursive( _ast_store.get_child( n, 0u ) );
+      apply_recursive( _ast_store.get_child( n, 1u ) );
       _reader.on_binary_op( n, _ast_store.get_data( n ).lexem, _ast_store.get_child( n, 0u ), _ast_store.get_child( n, 1u ) );
       break;
     default:
