@@ -108,6 +108,8 @@ struct hash<copycat::ltl_node>
     seed += node.children[1u].index * 2971;
     seed += node.children[0u].weight * 911;
     seed += node.children[1u].weight * 353;
+    seed += node.data[0u] * 911;
+    seed += node.data[1u] * 353;
     return seed;
   }
 };
@@ -242,6 +244,11 @@ public:
   uint32_t num_formulas() const
   {
     return storage->outputs.size();
+  }
+
+  uint32_t num_nodes() const
+  {
+    return storage->nodes.size();
   }
 
   ltl_formula get_constant( bool value ) const
@@ -515,6 +522,19 @@ public:
     for ( auto i = 0u; i < 2u; ++i )
     {
       fn( ltl_formula{storage->nodes[n].children[i]}, i );
+    }
+  }
+
+  template<typename Fn>
+  void foreach_formula( Fn&& fn ) const
+  {
+    auto begin = storage->outputs.begin(), end = storage->outputs.end();
+    while ( begin != end )
+    {
+      if ( !fn( *begin++ ) )
+      {
+        return;
+      }
     }
   }
 
