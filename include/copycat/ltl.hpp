@@ -48,6 +48,7 @@ enum ltl_operator
   Next = 3,
   Eventually = 4,
   Until = 5,
+  Releases = 6,
 }; /* ltl_operator */
 
 class ltl_node_pointer
@@ -368,6 +369,33 @@ public:
     return {index,0};
   }
 
+  ltl_formula create_releases( ltl_formula const& a, ltl_formula const& b )
+  {
+    ltl_storage::node_type n;
+    n.children[0] = a;
+    n.children[1] = b;
+    n.data[0] = ltl_operator::Releases;
+    n.data[1] = 0;
+
+    const auto it = storage->hash.find( n );
+    if ( it != std::end( storage->hash ) )
+    {
+      return {it->second, 0};
+    }
+
+    const auto index = node( storage->nodes.size() );
+    if ( index >= .9 * storage->nodes.capacity() )
+    {
+      storage->nodes.reserve( uint32_t( 3.1415f * index ) );
+      storage->hash.reserve( uint32_t( 3.1415f * index ) );
+    }
+
+    storage->nodes.push_back( n );
+    storage->hash[n] = index;
+
+    return {index,0};
+  }
+
   ltl_formula create_eventually( ltl_formula const &a )
   {
     /* trivial cases */
@@ -449,6 +477,11 @@ public:
   bool is_until( node const& n ) const
   {
     return storage->nodes[n].data[0] == ltl_operator::Until;
+  }
+
+  bool is_releases( node const& n ) const
+  {
+    return storage->nodes[n].data[0] == ltl_operator::Releases;
   }
 
   node get_node( ltl_formula const& f ) const
