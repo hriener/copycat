@@ -252,7 +252,7 @@ public:
 
       if ( c == '*' && comment_mode == 2 )
       {
-        ++comment_mode;
+        comment_mode = 3;
         lexem.push_back( c );
         continue;
       }
@@ -262,6 +262,13 @@ public:
         // std::cout << lexem << std::endl;
         comment_mode = 0;
         lexem = "";
+        continue;
+      }
+
+      if ( comment_mode >= 2 )
+      {
+        lexem.push_back( c );
+        comment_mode = 2;
         continue;
       }
       /* end parsing */
