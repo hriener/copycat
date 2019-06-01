@@ -39,3 +39,8 @@ if (NOT TARGET sat)
   add_library(sat INTERFACE)
   target_include_directories(sat INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/sat)
 endif()
+
+if (NOT TARGET percy)
+  add_library(percy INTERFACE)
+  target_include_directories(percy INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/percy/include)
+endif()
