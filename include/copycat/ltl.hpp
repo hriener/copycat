@@ -44,11 +44,12 @@ enum ltl_operator
 {
   Constant = 0,
   Variable = 1,
-  Or = 2,
-  Next = 3,
-  Eventually = 4,
-  Until = 5,
-  Releases = 6,
+  And = 2,
+  Or = 3,
+  Next = 4,
+  Eventually = 5,
+  Until = 6,
+  Releases = 7,
 }; /* ltl_operator */
 
 class ltl_node_pointer
@@ -316,6 +317,49 @@ public:
     return {index,0};
   }
 
+  ltl_formula create_and( ltl_formula a, ltl_formula b )
+  {
+    /* order inputs */
+    if ( a.index > b.index )
+    {
+      std::swap( a, b );
+    }
+
+    /* trivial cases */
+    if ( a.index == b.index )
+    {
+      return ( a.complement == b.complement ) ? a : get_constant( false );
+    }
+    else if ( a.index == 0 )
+    {
+      return a.complement ? b : get_constant( false );
+    }
+
+    ltl_storage::node_type n;
+    n.children[0] = a;
+    n.children[1] = b;
+    n.data[0] = ltl_operator::And;
+    n.data[1] = 0;
+
+    const auto it = storage->hash.find( n );
+    if ( it != std::end( storage->hash ) )
+    {
+      return {it->second, 0};
+    }
+
+    const auto index = node( storage->nodes.size() );
+    if ( index >= .9 * storage->nodes.capacity() )
+    {
+      storage->nodes.reserve( uint32_t( 3.1415f * index ) );
+      storage->hash.reserve( uint32_t( 3.1415f * index ) );
+    }
+
+    storage->nodes.push_back( n );
+    storage->hash[n] = index;
+
+    return {index,0};
+  }
+
   ltl_formula create_next( ltl_formula const& a )
   {
     /* trivial cases */
@@ -469,6 +513,11 @@ public:
   bool is_or( node const& n ) const
   {
     return storage->nodes[n].data[0] == ltl_operator::Or;
+  }
+
+  bool is_and( node const& n ) const
+  {
+    return storage->nodes[n].data[0] == ltl_operator::And;
   }
 
   bool is_next( node const& n ) const
