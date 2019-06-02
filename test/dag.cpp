@@ -3,7 +3,7 @@
 #include <fmt/format.h>
 #include <iostream>
 
-using namespace copycat;
+using namespace percy;
 
 template<int FI>
 void to_dot( dag<FI> const& d, std::ostream& os )

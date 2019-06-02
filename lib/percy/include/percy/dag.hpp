@@ -1,4 +1,4 @@
-/* copycat
+/* percy
  * Copyright (C) 2018  EPFL
  *
  * Permission is hereby granted, free of charge, to any person
@@ -34,7 +34,7 @@
 #include <array>
 #include <vector>
 
-namespace copycat
+namespace percy
 {
 
 namespace detail
@@ -58,7 +58,7 @@ public:
   static const int num_fanins = FI;
 
 public:
-  explicit dag() {}
+  explicit dag() = default;
 
   explicit dag( int num_inputs )
   {
@@ -246,9 +246,7 @@ public:
   using fanin = int;
   using vertex = std::pair<int,int>;
 
-  explicit dag()
-  {
-  }
+  explicit dag() = default;
 
   explicit dag( int num_inputs )
   {
@@ -499,4 +497,4 @@ using vertex = typename Dag::vertex;
 using binary_dag = dag<2>;
 using ternary_dag = dag<3>;
 
-} /* namespace copycat */
+} /* namespace percy */
