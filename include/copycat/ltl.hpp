@@ -318,7 +318,7 @@ public:
 
   ltl_formula create_and( ltl_formula const& a, ltl_formula const& b )
   {
-      return !create_or(!a, !b);
+      return !create_or( !a, !b );
   }
 
   ltl_formula create_next( ltl_formula const& a )
@@ -360,6 +360,33 @@ public:
     n.children[0] = a;
     n.children[1] = b;
     n.data[0] = ltl_operator::Until;
+    n.data[1] = 0;
+
+    const auto it = storage->hash.find( n );
+    if ( it != std::end( storage->hash ) )
+    {
+      return {it->second, 0};
+    }
+
+    const auto index = node( storage->nodes.size() );
+    if ( index >= .9 * storage->nodes.capacity() )
+    {
+      storage->nodes.reserve( uint32_t( 3.1415f * index ) );
+      storage->hash.reserve( uint32_t( 3.1415f * index ) );
+    }
+
+    storage->nodes.push_back( n );
+    storage->hash[n] = index;
+
+    return {index,0};
+  }
+
+  ltl_formula create_releases( ltl_formula const& a, ltl_formula const& b )
+  {
+    ltl_storage::node_type n;
+    n.children[0] = a;
+    n.children[1] = b;
+    n.data[0] = ltl_operator::Releases;
     n.data[1] = 0;
 
     const auto it = storage->hash.find( n );
@@ -432,18 +459,18 @@ public:
     return !eventually( !a );
   }
 
-  ltl_formula create_weak_until( ltl_formula const& a, ltl_formula const& b )
+  ltl_formula weak_until( ltl_formula const& a, ltl_formula const& b )
   {
     /* (a)W(b) = ((a)U(b))|G(a) */
-    auto until = create_until(a, b);
-    auto globally = create_globally(a);
-    return create_or(until, globally);
+    const auto until = create_until( a, b );
+    const auto globally = create_globally( a );
+    return create_or( until, globally );
   }
 
-  ltl_formula create_releases( ltl_formula const& a, ltl_formula const& b )
+  ltl_formula releases( ltl_formula const& a, ltl_formula const& b )
   {
-    /* (a)R(b) = (b)W((a)&(b)) */
-    return create_weak_until(b, create_and(a, b));
+    /* (a)R(b) = !((!a)U(!b)) */
+    return !create_until( !a, !b );
   }
 
   bool is_constant( node const& n ) const
