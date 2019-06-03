@@ -145,16 +145,9 @@ public:
   uint32_t num_pis{0};
 }; /* ltl_storage */
 
-} /* namespace copycat */
-
-namespace copycat
-{
-
 class ltl_formula_store
 {
 public:
-  class ltl_operators;
-
   using node = uint32_t;
 
   struct ltl_formula
@@ -581,6 +574,8 @@ protected:
   std::shared_ptr<ltl_storage> storage;
 }; /* ltl_formula_store */
 
+using ltl_formula = ltl_formula_store::ltl_formula;
+
 } /* namespace copycat */
 
 namespace std
@@ -602,5 +597,3 @@ struct hash<copycat::ltl_formula_store::ltl_formula>
 }; /* hash */
 
 } /* namespace std */
-
-#include "utils/ltl_operators.hpp"
