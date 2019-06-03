@@ -6,6 +6,7 @@ using namespace copycat;
 TEST_CASE( "Evaluate LTL", "[ltl_evaluator]" )
 {
   ltl_formula_store store;
+  auto ops = ltl_formula_store::ltl_operators( store );
 
   auto const request = store.create_variable();
   auto const grant   = store.create_variable();
@@ -29,8 +30,7 @@ TEST_CASE( "Evaluate LTL", "[ltl_evaluator]" )
   t1.prefix.emplace_back( std::vector<uint32_t>{ store.get_node( request ) } );
 
   /* G( request --> F( grant ) ) */
-  auto const property =
-    store.globally(  store.create_or( !request, store.eventually( grant ) ) );
+  auto const property = ops.globally(  store.create_or( !request, ops.eventually( grant ) ) );
 
   ltl_finite_trace_evaluator eval( store );
   CHECK( evaluate<ltl_finite_trace_evaluator>( property, t0, eval ).is_inconclusive() );

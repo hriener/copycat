@@ -602,3 +602,5 @@ struct hash<copycat::ltl_formula_store::ltl_formula>
 }; /* hash */
 
 } /* namespace std */
+
+#include "utils/ltl_operators.hpp"

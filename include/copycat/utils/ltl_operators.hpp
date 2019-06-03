@@ -40,19 +40,20 @@ namespace copycat
 class ltl_formula_store::ltl_operators
 {
 public:
-  explicit ltl_operators( ltl_formula_store& s ) : storage( s )
+  explicit ltl_operators( ltl_formula_store& ltl )
+    : _ltl( ltl )
   {
   }
 
   ltl_formula make_and( ltl_formula const& a, ltl_formula const& b )
   {
-    return !storage.create_or( !a, !b );
+    return !_ltl.create_or( !a, !b );
   }
 
   ltl_formula eventually( ltl_formula const& a )
   {
     /* F(a) = (true)U(a) */
-    return storage.create_until( storage.get_constant( true ), a );
+    return _ltl.create_until( _ltl.get_constant( true ), a );
   }
 
   ltl_formula globally( ltl_formula const& a )
@@ -64,17 +65,18 @@ public:
   ltl_formula weak_until( ltl_formula const& a, ltl_formula const& b )
   {
     /* (a)W(b) = ((a)U(b))|G(a) */
-    const auto until = storage.create_until( a, b );
-    const auto globally = storage.create_globally( a );
-    return storage.create_or( until, globally );
+    const auto until = _ltl.create_until( a, b );
+    const auto globally = _ltl.create_globally( a );
+    return _ltl.create_or( until, globally );
   }
 
   ltl_formula releases( ltl_formula const& a, ltl_formula const& b )
   {
     /* (a)R(b) = !((!a)U(!b)) */
-    return !storage.create_until( !a, !b );
+    return !_ltl.create_until( !a, !b );
   }
 
-  ltl_formula_store& storage;
-};
+  ltl_formula_store& _ltl;
+}; /* ltl_formula_store::ltl_operatorss */
+
 }
