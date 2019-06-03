@@ -152,6 +152,8 @@ namespace copycat
 class ltl_formula_store
 {
 public:
+  class ltl_operators;
+
   using node = uint32_t;
 
   struct ltl_formula
@@ -316,11 +318,6 @@ public:
     return {index,0};
   }
 
-  ltl_formula create_and( ltl_formula const& a, ltl_formula const& b )
-  {
-      return !create_or( !a, !b );
-  }
-
   ltl_formula create_next( ltl_formula const& a )
   {
     /* trivial cases */
@@ -441,36 +438,10 @@ public:
     return {index,0};
   }
 
-  ltl_formula eventually( ltl_formula const &a )
-  {
-    /* F(a) = (true)U(a) */
-    return create_until( get_constant( true ), a );
-  }
-
   ltl_formula create_globally( ltl_formula const& a )
   {
     /* G(a) = !F(!(a)) */
     return !create_eventually( !a );
-  }
-
-  ltl_formula globally( ltl_formula const& a )
-  {
-    /* G(a) = !F(!(a)) */
-    return !eventually( !a );
-  }
-
-  ltl_formula weak_until( ltl_formula const& a, ltl_formula const& b )
-  {
-    /* (a)W(b) = ((a)U(b))|G(a) */
-    const auto until = create_until( a, b );
-    const auto globally = create_globally( a );
-    return create_or( until, globally );
-  }
-
-  ltl_formula releases( ltl_formula const& a, ltl_formula const& b )
-  {
-    /* (a)R(b) = !((!a)U(!b)) */
-    return !create_until( !a, !b );
   }
 
   bool is_constant( node const& n ) const
