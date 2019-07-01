@@ -1,3 +1,8 @@
+if (NOT TARGET bill)
+  add_library(bill INTERFACE)
+  target_include_directories(bill INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/bill/include)
+endif()
+
 if (NOT TARGET ez)
   add_library(ez INTERFACE)
   target_include_directories(ez INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/ez/include)
@@ -33,11 +38,6 @@ endif()
 if (NOT TARGET sparsepp)
   add_library(sparsepp INTERFACE)
   target_include_directories(sparsepp INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/sparsepp/include)
-endif()
-
-if (NOT TARGET sat)
-  add_library(sat INTERFACE)
-  target_include_directories(sat INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/sat)
 endif()
 
 if (NOT TARGET percy)
