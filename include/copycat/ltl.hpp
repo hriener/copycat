@@ -153,6 +153,8 @@ namespace copycat
 class ltl_formula_store
 {
 public:
+  class ltl_operators;
+
   using node = uint32_t;
 
   struct ltl_formula
@@ -480,22 +482,10 @@ public:
     return {index,0};
   }
 
-  ltl_formula eventually( ltl_formula const &a )
-  {
-    /* F(a) = (true)U(a) */
-    return create_until( get_constant( true ), a );
-  }
-
   ltl_formula create_globally( ltl_formula const& a )
   {
     /* G(a) = !F(!(a)) */
     return !create_eventually( !a );
-  }
-
-  ltl_formula globally( ltl_formula const& a )
-  {
-    /* G(a) = !F(!(a)) */
-    return !eventually( !a );
   }
 
   bool is_constant( node const& n ) const
@@ -612,3 +602,5 @@ struct hash<copycat::ltl_formula_store::ltl_formula>
 }; /* hash */
 
 } /* namespace std */
+
+#include "utils/ltl_operators.hpp"
