@@ -21,8 +21,8 @@ if(UNIX)
   endforeach()
 endif()
 
-add_subdirectory(include)
 add_subdirectory(lib)
+add_subdirectory(include)
 
 if(COPYCAT_EXAMPLES)
   add_subdirectory(examples)

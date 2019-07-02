@@ -18,12 +18,4 @@ if(UNIX)
   endforeach()
 endif()
 
-# Libs
-# =============================================================================
-add_subdirectory(libs)
-
-# Library
-# =============================================================================
-add_library(bill INTERFACE)
-target_include_directories(bill INTERFACE ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(bill INTERFACE sat_solvers)
+add_subdirectory(include)

@@ -42,48 +42,64 @@ struct trace
 public:
   explicit trace() = default;
 
-  std::vector<uint32_t> at( uint32_t index ) const
+  void emplace_prefix( std::vector<int> const& prop )
   {
-    if ( index < prefix.size() )
-    {
-      return prefix.at( index );
-    }
-    else
-    {
-      return suffix.at( index - prefix.size() );
-    }
+    assert( _suffix_length == 0u );
+    _data.emplace_back( prop );
+    ++_prefix_length;
   }
 
-  bool has( uint32_t index, uint32_t value ) const
+  void emplace_suffix( std::vector<int> const& prop )
   {
+    _data.emplace_back( prop );
+    ++_suffix_length;
+  }
+
+  bool is_true( uint32_t time_index, int32_t prop_index ) const
+  {
+    assert( time_index < _data.size() );
+    auto const& data = _data.at( time_index );
+    return std::find( std::begin( data ), std::end( data ), prop_index ) != std::end( data );
+  }
+
+  std::vector<int32_t> at( uint32_t index ) const
+  {
+    assert( index < _data.size() );
+    return _data.at( index );
+  }
+
+  bool has( uint32_t index, int32_t value ) const
+  {
+    assert( index < _data.size() );
     auto const values = at( index );
     return ( std::find( std::begin( values ), std::end( values ), value ) != std::end( values ) );
   }
 
   uint64_t length() const
   {
-    return prefix.size() + suffix.size();
+    assert( _prefix_length + _suffix_length == _data.size() );
+    return _data.size();
   }
 
   uint64_t prefix_length() const
   {
-    return prefix.size();
+    return _prefix_length;
   }
 
   uint64_t suffix_length() const
   {
-    return suffix.size();
+    return _suffix_length;
   }
 
   bool is_finite() const
   {
-    return suffix.size() == 0u;
+    return _suffix_length == 0u;
   }
 
 public:
-  std::vector<std::vector<uint32_t>> prefix;
-  std::vector<std::vector<uint32_t>> suffix;
+  uint32_t _prefix_length = 0u;
+  uint32_t _suffix_length = 0u;
+  std::vector<std::vector<int32_t>> _data;
 }; /* trace */
 
 } /* namespace copycat */
-

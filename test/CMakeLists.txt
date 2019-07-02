@@ -3,4 +3,4 @@ include_directories(catch2) # v2.2.1
 file(GLOB_RECURSE FILENAMES *.cpp)
 
 add_executable(run_tests ${FILENAMES})
-target_link_libraries(run_tests copycat ez kitty mockturtle lorina sparsepp bill percy)
+target_link_libraries(run_tests copycat bill ez kitty mockturtle lorina sparsepp percy)

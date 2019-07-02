@@ -1,6 +1,12 @@
 if (NOT TARGET bill)
   add_library(bill INTERFACE)
   target_include_directories(bill INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/bill/include)
+  target_link_libraries(bill INTERFACE sat_solvers)
+endif()
+
+if (NOT TARGET sat_solvers)
+  add_library(sat_solvers INTERFACE)
+  target_include_directories(sat_solvers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/sat_solvers)
 endif()
 
 if (NOT TARGET ez)

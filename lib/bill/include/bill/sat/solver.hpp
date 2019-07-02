@@ -15,9 +15,9 @@
 #pragma GCC diagnostic ignored "-Wunused-value"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wzero-length-array"
-#include "sat_solvers/ghack.hpp"
-#include "sat_solvers/glucose.hpp"
-#include "sat_solvers/maple.hpp"
+#include <sat_solvers/ghack.hpp>
+#include <sat_solvers/glucose.hpp>
+#include <sat_solvers/maple.hpp>
 #pragma GCC diagnostic pop
 #else
 #pragma warning(push)
@@ -27,9 +27,9 @@
 #pragma warning(disable:4710)
 #pragma warning(disable:4774)
 #pragma warning(disable:4820)
-#include "sat_solvers/ghack.hpp"
-#include "sat_solvers/glucose.hpp"
-#include "sat_solvers/maple.hpp"
+#include <sat_solvers/ghack.hpp>
+#include <sat_solvers/glucose.hpp>
+#include <sat_solvers/maple.hpp>
 #pragma warning(pop)
 #endif
 
