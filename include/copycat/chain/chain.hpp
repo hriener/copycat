@@ -125,7 +125,7 @@ public:
     assert( _labels.size() == _steps.size() );
     return _num_inputs + _steps.size();
   }
-  
+
   /*! \brief Returns the number of inputs */
   uint32_t num_inputs() const
   {
@@ -181,6 +181,38 @@ public:
 
     _labels[index - _num_inputs - 1u] = label;
     _steps[index - _num_inputs - 1u] = step;
+  }
+
+  /*! \brief Remove unused steps (inplace) */
+  void remove_unused_steps()
+  {
+    assert( _steps.size() == _labels.size() );
+
+    std::vector<bool> used( _steps.size(), false );
+    for ( auto i = 0u; i < _steps.size(); ++i )
+    {
+      for ( const auto& s : _steps.at( i ) )
+      {
+        used[s] = true;
+      }
+    }
+
+    /* last step is always used */
+    used[_steps.size()-1u] = true;
+
+    /* re-construct _steps and _labels */
+    std::vector<step_type> new_steps;
+    std::vector<label_type> new_labels;
+    for ( auto i = 0u; i < used.size(); ++i )
+    {
+      if ( used.at( i ) )
+      {
+        new_steps.emplace_back( _steps.at( i ) );
+        new_labels.emplace_back( _labels.at( i ) );
+      }
+    }
+    _steps = new_steps;
+    _labels = new_labels;
   }
 
   /*! \brief Incomplete check to ensure correctness of the data structure */
