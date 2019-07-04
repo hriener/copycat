@@ -1,9 +1,9 @@
 #include <catch.hpp>
-#include <percy/dag.hpp>
+#include <copycat/dag.hpp>
 #include <fmt/format.h>
 #include <iostream>
 
-using namespace percy;
+using namespace copycat;
 
 template<int FI>
 void to_dot( dag<FI> const& d, std::ostream& os )
@@ -69,3 +69,4 @@ TEST_CASE( "ternary_dag", "[dag]" )
 
   to_dot( d, std::cout );
 }
+

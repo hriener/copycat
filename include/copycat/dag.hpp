@@ -34,7 +34,7 @@
 #include <array>
 #include <vector>
 
-namespace percy
+namespace copycat
 {
 
 namespace detail
@@ -497,4 +497,4 @@ using vertex = typename Dag::vertex;
 using binary_dag = dag<2>;
 using ternary_dag = dag<3>;
 
-} /* namespace percy */
+} /* namespace copycat */
