@@ -1,6 +1,8 @@
 #include <catch.hpp>
 #include <copycat/chain/print.hpp>
 #include <copycat/algorithms/ltl_learner.hpp>
+#include <copycat/algorithms/ltl_pdag_learner.hpp>
+#include <percy/partial_dag.hpp>
 #include <bill/sat/solver.hpp>
 
 #include <iostream>
@@ -177,7 +179,6 @@ TEST_CASE( "Learn next", "[ltl_learner]" )
   solver_t solver;
   ltl_encoder enc( solver );
 
-  /* prepare specification */
   trace t0;
   t0.emplace_prefix( { 2 } );
   t0.emplace_prefix( { 1 } );
@@ -205,4 +206,58 @@ TEST_CASE( "Learn next", "[ltl_learner]" )
   auto const& c = enc.extract_chain();
   write_chain( c, chain_as_string );
   CHECK( chain_as_string.str() == "1 := x0\n2 := X( 1 )\n" );
+}
+
+TEST_CASE( "Learn LTL using partial DAGs", "[ltl_learner]" )
+{
+  using solver_t = bill::solver<bill::solvers::glucose_41>;
+  solver_t solver;
+  ltl_pdag_encoder enc( solver );
+
+  trace t0;
+  t0.emplace_prefix( { 2 } );
+  t0.emplace_prefix( { 1 } );
+
+  trace t1;
+  t1.emplace_prefix( { 2 } );
+
+  /* pre-compute partial DAGs to guide synthesis */
+  auto const pdags = percy::pd_generate_max( /* num_inner_nodes = */ 1u );
+
+  /* enumerate over partial DAGs and try to label them to satisfy the spec */
+  for ( const auto& pd : pdags )
+  {
+#if 0
+    /* print the partial dag */
+    for ( const auto& step : pd.get_vertices() )
+    {
+      std::cout << "{ ";
+      for ( const auto& v : step )
+      {
+          std::cout << v << ' ';
+      }
+      std::cout << "} ";
+    }
+    std::cout << std::endl;
+#endif
+
+    ltl_pdag_encoder_parameter ps;
+    ps.verbose = false;
+    ps.num_propositions = 2u;
+    ps.ops = { operator_opcode::next_ };
+    ps.num_nodes = pd.nr_pi_fanins() + pd.nr_vertices();
+    ps.traces.push_back( std::make_pair( t0, true ) );
+    ps.traces.push_back( std::make_pair( t1, false ) );
+    ps.pdag = pd;
+
+    enc.encode( ps );
+
+    /* synthesize */
+    auto const result = solver.solve();
+    CHECK( result == bill::result::states::satisfiable );
+    std::stringstream chain_as_string;
+    auto const& c = enc.extract_chain();
+    write_chain( c, chain_as_string );
+    CHECK( chain_as_string.str() == "1 := x0\n2 := X( 1 )\n" );
+  }
 }
