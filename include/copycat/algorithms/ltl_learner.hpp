@@ -32,10 +32,10 @@
 
 #pragma once
 
-#include <copycat/trace.hpp>
 #include <copycat/chain/chain.hpp>
-#include <bill/sat/tseytin.hpp>
+#include <copycat/trace.hpp>
 #include <bill/sat/solver.hpp>
+#include <bill/sat/tseytin.hpp>
 #include <fmt/format.h>
 #include <unordered_map>
 #include <iostream>
@@ -50,6 +50,40 @@ enum class operator_opcode : uint32_t
   next_  = 2u,
   until_ = 3u,
 }; /* operator_opcodes */
+
+std::string operator_opcode_to_string( operator_opcode const& opcode )
+{
+  switch ( opcode )
+  {
+  case operator_opcode::not_:
+    return "~";
+  case operator_opcode::or_:
+    return "|";
+  case operator_opcode::next_:
+    return "X";
+  case operator_opcode::until_:
+    return "U";
+  default:
+    break;
+  }
+  return "?";
+}
+
+uint32_t operator_opcode_arity( operator_opcode const& opcode )
+{
+  switch ( opcode )
+  {
+  case operator_opcode::not_:
+  case operator_opcode::next_:
+    return 1;
+  case operator_opcode::or_:
+  case operator_opcode::until_:
+    return 2;
+  default:
+    break;
+  }
+  return 0;
+}
 
 struct ltl_encoder_parameter
 {
@@ -69,84 +103,7 @@ public:
   {
   }
 
-  bill::lit_type label_lit( uint32_t node_index, uint32_t label_index ) const
-  {
-    return bill::lit_type( label_var_begin + ( node_index - 1u ) * num_labels + label_index,
-                           bill::lit_type::polarities::positive );
-  }
-
-  bill::lit_type left_lit( uint32_t root_index, uint32_t child_index ) const
-  {
-    return bill::lit_type( structural_var_begin + ( root_index - 1u) * ( root_index - 2u ) + 2u * ( child_index - 1u ), bill::lit_type::polarities::positive );
-  }
-
-  bill::lit_type right_lit( uint32_t root_index, uint32_t child_index ) const
-  {
-    return bill::lit_type( structural_var_begin + ( root_index - 1u) * ( root_index - 2u ) + 2u * child_index - 1u, bill::lit_type::polarities::positive );
-  }
-
-  bill::lit_type trace_lit( uint32_t trace_index, uint32_t node_index, uint32_t time_index ) const
-  {
-    auto offset = 0u;
-    for ( auto i = 0u; i < trace_index; ++i )
-    {
-      offset += traces.at( i ).first.length() * num_nodes;
-    }
-    return bill::lit_type( trace_var_begin + offset + ( node_index - 1 ) * traces.at( trace_index ).first.length() + time_index, bill::lit_type::polarities::positive );
-  }
-
-  bill::lit_type add_tseytin_and(bill::lit_type const& a, bill::lit_type const& b)
-  {
-    auto const r = add_variable();
-    add_clause(std::vector{~a, ~b, r});
-    add_clause(std::vector{a, ~r});
-    add_clause(std::vector{b, ~r});
-    return bill::lit_type(r, bill::lit_type::polarities::positive);
-  }
-
-  bill::lit_type add_tseytin_and(std::vector<bill::lit_type> const& ls)
-  {
-    auto const r = add_variable();
-    std::vector<bill::lit_type> cls;
-    for ( const auto& l : ls )
-      cls.emplace_back(~l);
-    cls.emplace_back( r );
-    add_clause(cls);
-    for ( const auto& l : ls )
-      add_clause(std::vector{l, ~r});
-    return r;
-  }
-
-  bill::lit_type add_tseytin_or(bill::lit_type const& a, bill::lit_type const& b)
-  {
-    auto const r = add_variable();
-    add_clause(std::vector{a, b, ~r});
-    add_clause(std::vector{~a, r});
-    add_clause(std::vector{~b, r});
-    return r;
-  }
-
-  bill::lit_type add_tseytin_or(std::vector<bill::lit_type> const& ls)
-  {
-    auto const r = add_variable();
-    std::vector<bill::lit_type> cls(ls);
-    cls.emplace_back(~r);
-    add_clause(cls);
-    for ( const auto& l : ls )
-      add_clause(std::vector{~l, r});
-    return r;
-  }
-
-  bill::lit_type add_tseytin_equals(bill::lit_type const& a, bill::lit_type const& b)
-  {
-    auto const r = add_variable();
-    add_clause(std::vector{~a, ~b, r});
-    add_clause(std::vector{~a, b, ~r});
-    add_clause(std::vector{a, ~b, ~r});
-    add_clause(std::vector{a, b, r});
-    return r;
-  }
-
+  /*! \brief Encode paramters */
   void encode( ltl_encoder_parameter const& ps )
   {
     verbose = ps.verbose;
@@ -313,7 +270,7 @@ public:
     /* each node has to be labeled with at most one operator */
     for ( auto node_index = 1u; node_index <= num_nodes; ++node_index )
     {
-      for ( auto one_label_index = 1u; one_label_index < num_labels; ++one_label_index )
+      for ( auto one_label_index = 0u; one_label_index < num_labels; ++one_label_index )
       {
         for ( auto another_label_index = one_label_index + 1u; another_label_index < num_labels; ++another_label_index )
         {
@@ -504,6 +461,84 @@ public:
       }
     }
 
+    /* operator: until */
+    if ( std::find( std::begin( ops ), std::end( ops ), operator_opcode::until_ ) != std::end( ops ) )
+    {
+      for ( auto trace_index = 0u; trace_index < traces.size(); ++trace_index )
+      {
+        for ( auto root_index = 2u; root_index <+ num_nodes; ++root_index )
+        {
+          for ( auto one_child_index = 1u; one_child_index < root_index; ++one_child_index )
+          {
+            for ( auto another_child_index = 1u; another_child_index < root_index; ++another_child_index )
+            {
+              /* condition */
+              auto const t = add_tseytin_and(
+                { label_lit( root_index, operator_to_label[operator_opcode::until_] ), left_lit( root_index, one_child_index ), right_lit( root_index, another_child_index ) }
+                );
+
+              /* part 1 */
+              std::vector<bill::lit_type> equals_part1;
+              for ( auto time_index = 0u; time_index < traces.at( trace_index ).first.prefix_length(); ++time_index )
+              {
+                std::vector<bill::lit_type> ored;
+                for ( auto another_time_index = time_index; another_time_index < traces.at( trace_index ).first.length() - 1u; ++another_time_index )
+                {
+                  std::vector<bill::lit_type> enclosed;
+                  for ( auto one_more_time_index = time_index; one_more_time_index < another_time_index; ++one_more_time_index )
+                    enclosed.emplace_back( trace_lit( trace_index, one_child_index, one_more_time_index ) );
+                  enclosed.emplace_back( trace_lit( trace_index, another_child_index, another_time_index ) );
+                  ored.emplace_back( add_tseytin_and( enclosed ) );
+                }
+                auto const rhs = add_tseytin_or( ored );
+                auto const eq = add_tseytin_equals( trace_lit( trace_index, root_index, time_index ), rhs );
+                equals_part1.emplace_back( eq );
+              }
+              auto const part1 = add_tseytin_and( equals_part1 );
+
+              /* part 2 */
+              std::vector<bill::lit_type> equals_part2;
+              for ( auto time_index = traces.at( trace_index ).first.prefix_length(); time_index < traces.at( trace_index ).first.length(); ++time_index )
+              {
+                std::vector<bill::lit_type> ored;
+                for ( auto another_time_index = traces.at( trace_index ).first.prefix_length(); another_time_index < traces.at( trace_index ).first.length(); ++another_time_index )
+                {
+                  std::vector<bill::lit_type> enclosed;
+                  if ( time_index < another_time_index )
+                  {
+                    for ( auto one_more_time_index = time_index; one_more_time_index < another_time_index - 1; ++one_more_time_index )
+                      enclosed.emplace_back( trace_lit( trace_index, one_child_index, one_more_time_index ) );
+                    enclosed.emplace_back( trace_lit( trace_index, another_child_index, another_time_index ) );
+                    ored.emplace_back( add_tseytin_and( enclosed ) );
+                  }
+                  else
+                  {
+                    for ( auto one_more_time_index = traces.at( trace_index ).first.prefix_length(); one_more_time_index < another_time_index - 1; ++one_more_time_index )
+                    {
+                      enclosed.emplace_back( trace_lit( trace_index, one_child_index, one_more_time_index ) );
+                    }
+                    for ( auto one_more_time_index = time_index; one_more_time_index < traces.at( trace_index ).first.length() - 1; ++one_more_time_index )
+                    {
+                      enclosed.emplace_back( trace_lit( trace_index, one_child_index, one_more_time_index ) );
+                    }
+                    enclosed.emplace_back( trace_lit( trace_index, another_child_index, another_time_index ) );
+                    ored.emplace_back( add_tseytin_and( enclosed ) );
+                  }
+                }
+                auto const rhs = add_tseytin_or( ored );
+                auto const eq = add_tseytin_equals( trace_lit( trace_index, root_index, time_index ), rhs );
+                equals_part2.emplace_back( eq );
+              }
+              auto const part2 = add_tseytin_and( equals_part2 );
+
+              auto const part1_and_part2 = add_tseytin_and( part1, part2 );
+              add_clause( { ~t, part1_and_part2 } );
+            }
+          }
+        }
+      }
+    }
+
     /* trace semantics */
     for ( auto trace_index = 0u; trace_index < traces.size(); ++trace_index )
     {
@@ -624,6 +659,84 @@ public:
   }
 
 private:
+  bill::lit_type label_lit( uint32_t node_index, uint32_t label_index ) const
+  {
+    return bill::lit_type( label_var_begin + ( node_index - 1u ) * num_labels + label_index,
+                           bill::lit_type::polarities::positive );
+  }
+
+  bill::lit_type left_lit( uint32_t root_index, uint32_t child_index ) const
+  {
+    return bill::lit_type( structural_var_begin + ( root_index - 1u) * ( root_index - 2u ) + 2u * ( child_index - 1u ), bill::lit_type::polarities::positive );
+  }
+
+  bill::lit_type right_lit( uint32_t root_index, uint32_t child_index ) const
+  {
+    return bill::lit_type( structural_var_begin + ( root_index - 1u) * ( root_index - 2u ) + 2u * child_index - 1u, bill::lit_type::polarities::positive );
+  }
+
+  bill::lit_type trace_lit( uint32_t trace_index, uint32_t node_index, uint32_t time_index ) const
+  {
+    auto offset = 0u;
+    for ( auto i = 0u; i < trace_index; ++i )
+    {
+      offset += traces.at( i ).first.length() * num_nodes;
+    }
+    return bill::lit_type( trace_var_begin + offset + ( node_index - 1 ) * traces.at( trace_index ).first.length() + time_index, bill::lit_type::polarities::positive );
+  }
+
+  bill::lit_type add_tseytin_and(bill::lit_type const& a, bill::lit_type const& b)
+  {
+    auto const r = add_variable();
+    add_clause(std::vector{~a, ~b, r});
+    add_clause(std::vector{a, ~r});
+    add_clause(std::vector{b, ~r});
+    return r;
+  }
+
+  bill::lit_type add_tseytin_and(std::vector<bill::lit_type> const& ls)
+  {
+    auto const r = add_variable();
+    std::vector<bill::lit_type> cls;
+    for ( const auto& l : ls )
+      cls.emplace_back(~l);
+    cls.emplace_back( r );
+    add_clause(cls);
+    for ( const auto& l : ls )
+      add_clause(std::vector{l, ~r});
+    return r;
+  }
+
+  bill::lit_type add_tseytin_or(bill::lit_type const& a, bill::lit_type const& b)
+  {
+    auto const r = add_variable();
+    add_clause(std::vector{a, b, ~r});
+    add_clause(std::vector{~a, r});
+    add_clause(std::vector{~b, r});
+    return r;
+  }
+
+  bill::lit_type add_tseytin_or(std::vector<bill::lit_type> const& ls)
+  {
+    auto const r = add_variable();
+    std::vector<bill::lit_type> cls(ls);
+    cls.emplace_back(~r);
+    add_clause(cls);
+    for ( const auto& l : ls )
+      add_clause(std::vector{~l, r});
+    return r;
+  }
+
+  bill::lit_type add_tseytin_equals(bill::lit_type const& a, bill::lit_type const& b)
+  {
+    auto const r = add_variable();
+    add_clause(std::vector{~a, ~b, r});
+    add_clause(std::vector{~a, b, ~r});
+    add_clause(std::vector{a, ~b, ~r});
+    add_clause(std::vector{a, b, r});
+    return r;
+  }
+
   bill::lit_type add_variable( bill::lit_type::polarities pol = bill::lit_type::polarities::positive, std::string const& note = "" )
   {
     auto const r = _solver.add_variable();
