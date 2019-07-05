@@ -96,6 +96,24 @@ public:
     return _suffix_length == 0u;
   }
 
+  void print( std::ostream& os = std::cout ) const
+  {
+    assert( _prefix_length + _suffix_length == _data.size() );
+    for ( auto i = 0u; i < _data.size(); ++i )
+    {
+      if ( i == _prefix_length )
+        std::cout << "( ";
+
+      os << "{ ";
+      for ( const auto& v : _data.at( i ) )
+      {
+        os << v << ' ';
+      }
+      os << '}';
+    }
+    os << " )*" << std::endl;
+  }
+
 public:
   uint32_t _prefix_length = 0u;
   uint32_t _suffix_length = 0u;
