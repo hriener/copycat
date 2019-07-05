@@ -197,10 +197,20 @@ bool read_traces( std::istream& is, trace_reader const& reader )
         auto const affixes = detail::split_string( line, "::" );
         assert( affixes.size() <= 2u );
 
-        trace_t const prefix = detail::parse_trace( affixes[0u] );
-        trace_t const suffix = affixes.size() >= 2u ? detail::parse_trace( affixes[1u] ) : trace_t();
+        auto const lasso_start = affixes.size() >= 2u ? std::atoi( affixes[1u].c_str() ) : 0u;
+        trace_t const t = detail::parse_trace( affixes[0u] );
+        assert( lasso_start < t.size() );
 
-        reader.on_good_trace( prefix, suffix );
+        if ( lasso_start > 0u )
+        {
+          trace_t prefix( t.begin(), t.begin() + lasso_start );
+          trace_t suffix( t.begin() + lasso_start, t.end() );
+          reader.on_good_trace( prefix, suffix );
+        }
+        else
+        {
+          reader.on_good_trace( {}, t );
+        }
       }
       else if ( curr_section == bad_section )
       {
@@ -208,10 +218,20 @@ bool read_traces( std::istream& is, trace_reader const& reader )
         auto const affixes = detail::split_string( line, "::" );
         assert( affixes.size() <= 2u );
 
-        trace_t const prefix = detail::parse_trace( affixes[0u] );
-        trace_t const suffix = affixes.size() >= 2u ? detail::parse_trace( affixes[1u] ) : trace_t();
+        auto const lasso_start = affixes.size() >= 2u ? std::atoi( affixes[1u].c_str() ) : 0u;
+        trace_t const t = detail::parse_trace( affixes[0u] );
+        assert( lasso_start < t.size() );
 
-        reader.on_bad_trace( prefix, suffix );
+        if ( lasso_start > 0u )
+        {
+          trace_t prefix( t.begin(), t.begin() + lasso_start );
+          trace_t suffix( t.begin() + lasso_start, t.end() );
+          reader.on_bad_trace( prefix, suffix );
+        }
+        else
+        {
+          reader.on_bad_trace( {}, t );
+        }
       }
       else if ( curr_section == operator_section )
       {
