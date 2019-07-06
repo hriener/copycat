@@ -471,7 +471,7 @@ public:
     {
       for ( auto trace_index = 0u; trace_index < traces.size(); ++trace_index )
       {
-        for ( auto root_index = 2u; root_index <+ num_nodes; ++root_index )
+        for ( auto root_index = 2u; root_index <= num_nodes; ++root_index )
         {
           for ( auto one_child_index = 1u; one_child_index < root_index; ++one_child_index )
           {
@@ -483,61 +483,61 @@ public:
                 );
 
               /* part 1 */
-              std::vector<bill::lit_type> equals_part1;
-              for ( auto time_index = 0u; time_index < traces.at( trace_index ).first.prefix_length(); ++time_index )
-              {
-                std::vector<bill::lit_type> ored;
-                for ( auto another_time_index = time_index; another_time_index < traces.at( trace_index ).first.length() - 1u; ++another_time_index )
-                {
-                  std::vector<bill::lit_type> enclosed;
-                  for ( auto one_more_time_index = time_index; one_more_time_index < another_time_index; ++one_more_time_index )
-                    enclosed.emplace_back( trace_lit( trace_index, one_child_index, one_more_time_index ) );
-                  enclosed.emplace_back( trace_lit( trace_index, another_child_index, another_time_index ) );
-                  ored.emplace_back( add_tseytin_and( enclosed ) );
-                }
-                auto const rhs = add_tseytin_or( ored );
-                auto const eq = add_tseytin_equals( trace_lit( trace_index, root_index, time_index ), rhs );
-                equals_part1.emplace_back( eq );
-              }
-              auto const part1 = add_tseytin_and( equals_part1 );
+              auto const prefix_length = traces.at( trace_index ).first.prefix_length();
+              auto const trace_length = traces.at( trace_index ).first.length();
 
-              /* part 2 */
-              std::vector<bill::lit_type> equals_part2;
-              for ( auto time_index = traces.at( trace_index ).first.prefix_length(); time_index < traces.at( trace_index ).first.length(); ++time_index )
+              std::vector<bill::lit_type> as;
+              for ( auto time_index = 0u; time_index < prefix_length; ++time_index )
               {
-                std::vector<bill::lit_type> ored;
-                for ( auto another_time_index = traces.at( trace_index ).first.prefix_length(); another_time_index < traces.at( trace_index ).first.length(); ++another_time_index )
+                std::vector<bill::lit_type> bs;
+                for ( auto another_time_index = time_index; another_time_index < trace_length; ++another_time_index )
                 {
-                  std::vector<bill::lit_type> enclosed;
+                  std::vector<bill::lit_type> cs;
+                  for ( auto one_more_time_index = time_index; one_more_time_index < another_time_index; ++one_more_time_index )
+                  {
+                    cs.emplace_back( trace_lit( trace_index, one_child_index, one_more_time_index ) );
+                  }
+                  cs.emplace_back( trace_lit( trace_index, another_child_index, another_time_index ) );
+                  bs.emplace_back( add_tseytin_and( cs ) );
+                }
+                as.emplace_back( add_tseytin_equals( trace_lit( trace_index, root_index, time_index ), add_tseytin_or( bs ) ) );
+              }
+
+              for ( auto time_index = prefix_length; time_index < trace_length; ++time_index )
+              {
+                std::vector<bill::lit_type> bs;
+                for ( auto another_time_index = prefix_length; another_time_index < trace_length; ++another_time_index )
+                {
+                  /* case 1 */
+                  std::vector<bill::lit_type> cs;
                   if ( time_index < another_time_index )
                   {
-                    for ( auto one_more_time_index = time_index; one_more_time_index < another_time_index - 1; ++one_more_time_index )
-                      enclosed.emplace_back( trace_lit( trace_index, one_child_index, one_more_time_index ) );
-                    enclosed.emplace_back( trace_lit( trace_index, another_child_index, another_time_index ) );
-                    ored.emplace_back( add_tseytin_and( enclosed ) );
+                    for ( auto i = time_index; i <= another_time_index - 1; ++i )
+                    {
+                      cs.emplace_back( trace_lit( trace_index, one_child_index, i ) );
+                    }
                   }
+                  /* case 2 */
                   else
                   {
-                    for ( auto one_more_time_index = traces.at( trace_index ).first.prefix_length(); one_more_time_index < another_time_index - 1; ++one_more_time_index )
+                    assert( prefix_length <= another_time_index );
+                    assert( another_time_index < trace_length );
+                    for ( auto i = prefix_length; i < another_time_index; ++i )
                     {
-                      enclosed.emplace_back( trace_lit( trace_index, one_child_index, one_more_time_index ) );
+                      cs.emplace_back( trace_lit( trace_index, one_child_index, i ) );
                     }
-                    for ( auto one_more_time_index = time_index; one_more_time_index < traces.at( trace_index ).first.length() - 1; ++one_more_time_index )
+                    for ( auto i = time_index; i < trace_length; ++i )
                     {
-                      enclosed.emplace_back( trace_lit( trace_index, one_child_index, one_more_time_index ) );
+                      cs.emplace_back( trace_lit( trace_index, one_child_index, i ) );
                     }
-                    enclosed.emplace_back( trace_lit( trace_index, another_child_index, another_time_index ) );
-                    ored.emplace_back( add_tseytin_and( enclosed ) );
                   }
+                  cs.emplace_back( trace_lit( trace_index, another_child_index, another_time_index ) );
+                  bs.emplace_back( add_tseytin_and( cs ) );
                 }
-                auto const rhs = add_tseytin_or( ored );
-                auto const eq = add_tseytin_equals( trace_lit( trace_index, root_index, time_index ), rhs );
-                equals_part2.emplace_back( eq );
+                as.emplace_back( add_tseytin_equals( trace_lit( trace_index, root_index, time_index ), add_tseytin_or( bs ) ) );
               }
-              auto const part2 = add_tseytin_and( equals_part2 );
 
-              auto const part1_and_part2 = add_tseytin_and( part1, part2 );
-              add_clause( { ~t, part1_and_part2 } );
+              add_clause( { ~t, add_tseytin_and( as ) } );
             }
           }
         }
@@ -701,6 +701,11 @@ private:
 
   bill::lit_type add_tseytin_and(std::vector<bill::lit_type> const& ls)
   {
+    assert( ls.size() > 0u );
+
+    if ( ls.size() == 1u )
+      return ls[0u];
+
     auto const r = add_variable();
     std::vector<bill::lit_type> cls;
     for ( const auto& l : ls )
@@ -723,6 +728,11 @@ private:
 
   bill::lit_type add_tseytin_or(std::vector<bill::lit_type> const& ls)
   {
+    assert( ls.size() > 0u );
+
+    if ( ls.size() == 1u )
+      return ls[0u];
+
     auto const r = add_variable();
     std::vector<bill::lit_type> cls(ls);
     cls.emplace_back(~r);
