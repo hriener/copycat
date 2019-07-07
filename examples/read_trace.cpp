@@ -1,5 +1,8 @@
 #include <copycat/io/traces.hpp>
 #include <copycat/trace.hpp>
+#include <copycat/algorithms/ltl_learner.hpp>
+#include <copycat/chain/print.hpp>
+#include <bill/sat/solver.hpp>
 
 struct ltl_synthesis_spec
 {
@@ -49,12 +52,12 @@ public:
   {
     _spec.parameters.emplace_back( parameter );
   }
-  
+
   void on_formula( std::string const& formula ) const override
   {
     _spec.formulas.emplace_back( formula );
   }
-  
+
 private:
   ltl_synthesis_spec& _spec;
 }; /* ltl_synthesis_spec_reader */
@@ -67,6 +70,15 @@ bool read_ltl_synthesis_spec( std::istream& is, ltl_synthesis_spec& spec )
 bool read_ltl_synthesis_spec( std::string const& filename, ltl_synthesis_spec& spec )
 {
   return copycat::read_traces( filename, ltl_synthesis_spec_reader( spec ) );
+}
+
+namespace copycat::detail
+{
+  template<>
+  std::string label_to_string( std::string const& label )
+  {
+    return label;
+  }
 }
 
 int main( int argc, char* argv[] )
@@ -91,6 +103,74 @@ int main( int argc, char* argv[] )
   else
   {
     std::cout << filename << " failure" << std::endl;
+    return -1;
+  }
+
+  /* bound synthesis loop */
+  for ( uint32_t num_nodes = 1u; num_nodes <= 10u; ++num_nodes )
+  {
+
+    std::cout << "[i] bounded synthesis with " << num_nodes << std::endl;
+    using solver_t = bill::solver<bill::solvers::glucose_41>;
+    solver_t solver;
+    copycat::ltl_encoder enc( solver );
+
+    copycat::ltl_encoder_parameter ps;
+    ps.verbose = false;
+    ps.num_propositions = 2u;
+
+    std::vector<copycat::operator_opcode> ops;
+    for ( const auto& o : spec.operators )
+    {
+      if ( o == "!" )
+        ops.emplace_back( copycat::operator_opcode::not_ );
+      else if ( o == "|" )
+        ops.emplace_back( copycat::operator_opcode::or_ );
+      else if ( o == "X" )
+        ops.emplace_back( copycat::operator_opcode::next_ );
+      else if ( o == "U" )
+        ops.emplace_back( copycat::operator_opcode::until_ );
+      else
+       std::cout << fmt::format( "[w] unsupported operator `{}'\n", o );
+    }
+
+    /* default operator support */
+    if ( ops.size() == 0u )
+    {
+      ops.emplace_back( copycat::operator_opcode::not_ );
+      ops.emplace_back( copycat::operator_opcode::next_ );
+      ops.emplace_back( copycat::operator_opcode::or_ );
+      ops.emplace_back( copycat::operator_opcode::until_ );
+    }
+
+    ps.ops = ops;
+    ps.num_nodes = num_nodes;
+
+    for ( const auto& t : spec.good_traces )
+      ps.traces.emplace_back( std::make_pair( t, true ) );
+    for ( const auto& t : spec.bad_traces )
+      ps.traces.emplace_back( std::make_pair( t, false ) );
+
+    enc.encode( ps );
+    enc.allocate_variables();
+    // enc.print_allocated_variables();
+    enc.check_allocated_variables();
+    enc.create_clauses();
+
+    auto const result = solver.solve();
+    if ( result == bill::result::states::satisfiable )
+    {
+      // std::cout << "SAT" << std::endl;
+
+      std::stringstream chain_as_string;
+      auto const& c = enc.extract_chain();
+      copycat::write_chain( c );
+      return 1;
+    }
+    else
+    {
+      // std::cout << "UNSAT" << std::endl;
+    }
   }
 
   return 0;
