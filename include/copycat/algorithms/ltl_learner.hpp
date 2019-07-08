@@ -45,10 +45,14 @@ namespace copycat
 
 enum class operator_opcode : uint32_t
 {
-  not_   = 0u,
-  or_    = 1u,
-  next_  = 2u,
-  until_ = 3u,
+  not_        = 0u,
+  or_         = 1u,
+  next_       = 2u,
+  until_      = 3u,
+  implies_    = 4u,
+  and_        = 5u,
+  eventually_ = 6u,
+  globally_   = 7u,
 }; /* operator_opcodes */
 
 std::string operator_opcode_to_string( operator_opcode const& opcode )
@@ -57,12 +61,20 @@ std::string operator_opcode_to_string( operator_opcode const& opcode )
   {
   case operator_opcode::not_:
     return "~";
+  case operator_opcode::and_:
+    return "&";
   case operator_opcode::or_:
     return "|";
+  case operator_opcode::implies_:
+    return "->";
   case operator_opcode::next_:
     return "X";
   case operator_opcode::until_:
     return "U";
+  case operator_opcode::eventually_:
+    return "F";
+  case operator_opcode::globally_:
+    return "G";
   default:
     break;
   }
@@ -75,8 +87,12 @@ uint32_t operator_opcode_arity( operator_opcode const& opcode )
   {
   case operator_opcode::not_:
   case operator_opcode::next_:
+  case operator_opcode::eventually_:
+  case operator_opcode::globally_:
     return 1;
+  case operator_opcode::and_:
   case operator_opcode::or_:
+  case operator_opcode::implies_:
   case operator_opcode::until_:
     return 2;
   default:
@@ -251,6 +267,35 @@ public:
     }
   }
 
+  std::vector<uint32_t> positions_between( uint32_t time_index, uint32_t another_time_index, uint32_t prefix_length, uint32_t trace_length )
+  {
+    std::vector<uint32_t> pos;
+    if ( time_index < another_time_index )
+    {
+      for ( auto i = time_index; i < another_time_index; ++i )
+      {
+        pos.emplace_back( i );
+      }
+    }
+    else if ( time_index == another_time_index )
+    {
+      return {};
+    }
+    else
+    {
+      for ( auto i = prefix_length; i < another_time_index; ++i )
+      {
+        pos.emplace_back( i );
+      }
+      for ( auto i = time_index; i < trace_length; ++i )
+      {
+        pos.emplace_back( i );
+      }
+    }
+
+    return pos;
+  }
+
   void create_clauses()
   {
     if ( verbose )
@@ -402,6 +447,36 @@ public:
       }
     }
 
+    /* operator: and */
+    if ( std::find( std::begin( ops ), std::end( ops ), operator_opcode::and_ ) != std::end( ops ) )
+    {
+      for ( auto trace_index = 0u; trace_index < traces.size(); ++trace_index )
+      {
+        for ( auto root_index = 2u; root_index <= num_nodes; ++root_index )
+        {
+          for ( auto one_child_index = 1u; one_child_index < root_index; ++one_child_index )
+          {
+            for ( auto another_child_index = 1u; another_child_index < root_index; ++another_child_index )
+            {
+              auto const t = add_tseytin_and(
+                { label_lit( root_index, operator_to_label[operator_opcode::and_] ), left_lit( root_index, one_child_index ), right_lit( root_index, another_child_index ) }
+                );
+
+              std::vector<bill::lit_type> cube;
+              for ( auto time_index = 0u; time_index < traces.at( trace_index ).first.length(); ++time_index )
+              {
+                auto const t_and = add_tseytin_and( trace_lit( trace_index, one_child_index, time_index ), trace_lit( trace_index, another_child_index, time_index ) );
+                auto const t_eq = add_tseytin_equals( trace_lit( trace_index, root_index, time_index ), t_and );
+                cube.emplace_back( t_eq );
+              }
+              auto const t_and = add_tseytin_and( cube );
+              add_clause( { ~t, t_and } );
+            }
+          }
+        }
+      }
+    }
+
     /* operator: or */
     if ( std::find( std::begin( ops ), std::end( ops ), operator_opcode::or_ ) != std::end( ops ) )
     {
@@ -422,6 +497,36 @@ public:
               {
                 auto const t_or = add_tseytin_or( trace_lit( trace_index, one_child_index, time_index ), trace_lit( trace_index, another_child_index, time_index ) );
                 auto const t_eq = add_tseytin_equals( trace_lit( trace_index, root_index, time_index ), t_or );
+                cube.emplace_back( t_eq );
+              }
+              auto const t_and = add_tseytin_and( cube );
+              add_clause( { ~t, t_and } );
+            }
+          }
+        }
+      }
+    }
+
+    /* operator: implies */
+    if ( std::find( std::begin( ops ), std::end( ops ), operator_opcode::implies_ ) != std::end( ops ) )
+    {
+      for ( auto trace_index = 0u; trace_index < traces.size(); ++trace_index )
+      {
+        for ( auto root_index = 2u; root_index <= num_nodes; ++root_index )
+        {
+          for ( auto one_child_index = 1u; one_child_index < root_index; ++one_child_index )
+          {
+            for ( auto another_child_index = 1u; another_child_index < root_index; ++another_child_index )
+            {
+              auto const t = add_tseytin_and(
+                { label_lit( root_index, operator_to_label[operator_opcode::implies_] ), left_lit( root_index, one_child_index ), right_lit( root_index, another_child_index ) }
+                );
+
+              std::vector<bill::lit_type> cube;
+              for ( auto time_index = 0u; time_index < traces.at( trace_index ).first.length(); ++time_index )
+              {
+                auto const t_implies = add_tseytin_or( ~trace_lit( trace_index, one_child_index, time_index ), trace_lit( trace_index, another_child_index, time_index ) );
+                auto const t_eq = add_tseytin_equals( trace_lit( trace_index, root_index, time_index ), t_implies );
                 cube.emplace_back( t_eq );
               }
               auto const t_and = add_tseytin_and( cube );
@@ -466,6 +571,92 @@ public:
       }
     }
 
+    /* operator: eventually */
+    if ( std::find( std::begin( ops ), std::end( ops ), operator_opcode::eventually_ ) != std::end( ops ) )
+    {
+      for ( auto trace_index = 0u; trace_index < traces.size(); ++trace_index )
+      {
+        for ( auto root_index = 2u; root_index <= num_nodes; ++root_index )
+        {
+          for ( auto one_child_index = 1u; one_child_index < root_index; ++one_child_index )
+          {
+            /* condition */
+            auto const t = add_tseytin_and(
+                { label_lit( root_index, operator_to_label[operator_opcode::eventually_] ), left_lit( root_index, one_child_index ) }
+              );
+
+            auto const prefix_length = traces.at( trace_index ).first.prefix_length();
+            auto const trace_length = traces.at( trace_index ).first.length();
+
+            std::vector<bill::lit_type> bs;
+            for ( auto time_index = 0u; time_index < trace_length; ++time_index )
+            {
+              std::vector<bill::lit_type> as;
+              for ( auto another_time_index = time_index; another_time_index < trace_length; ++another_time_index )
+                as.emplace_back( trace_lit( trace_index, one_child_index, another_time_index ) );
+              bs.emplace_back( add_tseytin_equals( trace_lit( trace_index, root_index, time_index ), add_tseytin_or( as ) ) );
+            }
+            auto const prefix_part = add_tseytin_and( bs );
+
+            std::vector<bill::lit_type> cs;
+            for ( auto time_index = prefix_length; time_index < trace_length; ++time_index )
+            {
+              std::vector<bill::lit_type> as;
+              for ( auto another_time_index = prefix_length; another_time_index < trace_length; ++another_time_index )
+                as.emplace_back( trace_lit( trace_index, one_child_index, another_time_index ) );
+              cs.emplace_back( add_tseytin_equals( trace_lit( trace_index, root_index, time_index ), add_tseytin_or( as ) ) );
+            }
+            auto const postfix_part = add_tseytin_and( cs );
+
+            add_clause( { ~t, add_tseytin_and( prefix_part, postfix_part ) } );
+          }
+        }
+      }
+    }
+
+    /* operator: globally */
+    if ( std::find( std::begin( ops ), std::end( ops ), operator_opcode::globally_ ) != std::end( ops ) )
+    {
+      for ( auto trace_index = 0u; trace_index < traces.size(); ++trace_index )
+      {
+        for ( auto root_index = 2u; root_index <= num_nodes; ++root_index )
+        {
+          for ( auto one_child_index = 1u; one_child_index < root_index; ++one_child_index )
+          {
+            /* condition */
+            auto const t = add_tseytin_and(
+                { label_lit( root_index, operator_to_label[operator_opcode::globally_] ), left_lit( root_index, one_child_index ) }
+              );
+
+            auto const prefix_length = traces.at( trace_index ).first.prefix_length();
+            auto const trace_length = traces.at( trace_index ).first.length();
+
+            std::vector<bill::lit_type> bs;
+            for ( auto time_index = 0u; time_index < trace_length; ++time_index )
+            {
+              std::vector<bill::lit_type> as;
+              for ( auto another_time_index = time_index; another_time_index < trace_length; ++another_time_index )
+                as.emplace_back( trace_lit( trace_index, one_child_index, another_time_index ) );
+              bs.emplace_back( add_tseytin_equals( trace_lit( trace_index, root_index, time_index ), add_tseytin_and( as ) ) );
+            }
+            auto const prefix_part = add_tseytin_and( bs );
+
+            std::vector<bill::lit_type> cs;
+            for ( auto time_index = prefix_length; time_index < trace_length; ++time_index )
+            {
+              std::vector<bill::lit_type> as;
+              for ( auto another_time_index = prefix_length; another_time_index < trace_length; ++another_time_index )
+                as.emplace_back( trace_lit( trace_index, one_child_index, another_time_index ) );
+              cs.emplace_back( add_tseytin_equals( trace_lit( trace_index, root_index, time_index ), add_tseytin_and( as ) ) );
+            }
+            auto const postfix_part = add_tseytin_and( cs );
+
+            add_clause( { ~t, add_tseytin_and( prefix_part, postfix_part ) } );
+          }
+        }
+      }
+    }
+
     /* operator: until */
     if ( std::find( std::begin( ops ), std::end( ops ), operator_opcode::until_ ) != std::end( ops ) )
     {
@@ -479,10 +670,9 @@ public:
             {
               /* condition */
               auto const t = add_tseytin_and(
-                { label_lit( root_index, operator_to_label[operator_opcode::until_] ), left_lit( root_index, one_child_index ), right_lit( root_index, another_child_index ) }
+                  { label_lit( root_index, operator_to_label[operator_opcode::until_] ), left_lit( root_index, one_child_index ), right_lit( root_index, another_child_index ) }
                 );
 
-              /* part 1 */
               auto const prefix_length = traces.at( trace_index ).first.prefix_length();
               auto const trace_length = traces.at( trace_index ).first.length();
 
@@ -508,28 +698,10 @@ public:
                 std::vector<bill::lit_type> bs;
                 for ( auto another_time_index = prefix_length; another_time_index < trace_length; ++another_time_index )
                 {
-                  /* case 1 */
                   std::vector<bill::lit_type> cs;
-                  if ( time_index < another_time_index )
+                  for ( auto const& one_more_time_index : positions_between( time_index, another_time_index, prefix_length, trace_length ) )
                   {
-                    for ( auto i = time_index; i <= another_time_index - 1; ++i )
-                    {
-                      cs.emplace_back( trace_lit( trace_index, one_child_index, i ) );
-                    }
-                  }
-                  /* case 2 */
-                  else
-                  {
-                    assert( prefix_length <= another_time_index );
-                    assert( another_time_index < trace_length );
-                    for ( auto i = prefix_length; i < another_time_index; ++i )
-                    {
-                      cs.emplace_back( trace_lit( trace_index, one_child_index, i ) );
-                    }
-                    for ( auto i = time_index; i < trace_length; ++i )
-                    {
-                      cs.emplace_back( trace_lit( trace_index, one_child_index, i ) );
-                    }
+                    cs.emplace_back( trace_lit( trace_index, one_child_index, one_more_time_index ) );
                   }
                   cs.emplace_back( trace_lit( trace_index, another_child_index, another_time_index ) );
                   bs.emplace_back( add_tseytin_and( cs ) );
@@ -598,9 +770,17 @@ public:
             {
               label = "~";
             }
+            else if ( op_label == operator_to_label[operator_opcode::and_] )
+            {
+              label = "&";
+            }
             else if ( op_label == operator_to_label[operator_opcode::or_] )
             {
               label = "|";
+            }
+            else if ( op_label == operator_to_label[operator_opcode::implies_] )
+            {
+              label = "->";
             }
             else if ( op_label == operator_to_label[operator_opcode::next_] )
             {
@@ -609,6 +789,14 @@ public:
             else if ( op_label == operator_to_label[operator_opcode::until_] )
             {
               label = "U";
+            }
+            else if ( op_label == operator_to_label[operator_opcode::eventually_] )
+            {
+              label = "F";
+            }
+            else if ( op_label == operator_to_label[operator_opcode::globally_] )
+            {
+              label = "G";
             }
             else
             {
@@ -634,7 +822,7 @@ public:
         }
 
         /* unary operators have no right child */
-        if ( label->substr( 0, 1 ) == "~" || label->substr( 0, 1 ) == "X" ) continue;
+        if ( label->substr( 0, 1 ) == "~" || label->substr( 0, 1 ) == "X" || label->substr( 0, 1 ) == "F" || label->substr( 0, 1 ) == "G" ) continue;
 
         if ( model.at( right_lit( node_index, child_index ).variable() ) == bill::lbool_type::true_ )
         {

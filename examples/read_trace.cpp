@@ -91,14 +91,16 @@ int main( int argc, char* argv[] )
   if ( read_ltl_synthesis_spec( filename, spec ) )
   {
     std::cout << filename << " success" << std::endl;
-    for ( const auto& t : spec.good_traces )
-    {
-      std::cout << "[+] "; t.print();
-    }
-    for ( const auto& t : spec.bad_traces )
-    {
-      std::cout << "[-] "; t.print();
-    }
+    // for ( const auto& t : spec.good_traces )
+    // {
+    //   std::cout << "[+] "; t.print();
+    // }
+    // for ( const auto& t : spec.bad_traces )
+    // {
+    //   std::cout << "[-] "; t.print();
+    // }
+    std::cout << "[i] #good traces: " << spec.good_traces.size() << std::endl;
+    std::cout << "[i] #bad traces: "  << spec.bad_traces.size() << std::endl;
   }
   else
   {
@@ -124,14 +126,24 @@ int main( int argc, char* argv[] )
     {
       if ( o == "!" )
         ops.emplace_back( copycat::operator_opcode::not_ );
+      else if ( o == "&" )
+        ops.emplace_back( copycat::operator_opcode::and_ );
       else if ( o == "|" )
         ops.emplace_back( copycat::operator_opcode::or_ );
+      else if ( o == "->" )
+        ops.emplace_back( copycat::operator_opcode::implies_ );
       else if ( o == "X" )
         ops.emplace_back( copycat::operator_opcode::next_ );
       else if ( o == "U" )
         ops.emplace_back( copycat::operator_opcode::until_ );
+      else if ( o == "F" )
+        ops.emplace_back( copycat::operator_opcode::eventually_ );
+      else if ( o == "G" )
+        ops.emplace_back( copycat::operator_opcode::globally_ );
       else
-       std::cout << fmt::format( "[w] unsupported operator `{}'\n", o );
+      {
+        std::cout << fmt::format( "[w] unsupported operator `{}'\n", o );
+      }
     }
 
     /* default operator support */
@@ -139,8 +151,12 @@ int main( int argc, char* argv[] )
     {
       ops.emplace_back( copycat::operator_opcode::not_ );
       ops.emplace_back( copycat::operator_opcode::next_ );
+      ops.emplace_back( copycat::operator_opcode::and_ );
       ops.emplace_back( copycat::operator_opcode::or_ );
+      ops.emplace_back( copycat::operator_opcode::implies_ );
       ops.emplace_back( copycat::operator_opcode::until_ );
+      ops.emplace_back( copycat::operator_opcode::eventually_ );
+      ops.emplace_back( copycat::operator_opcode::globally_ );
     }
 
     ps.ops = ops;
