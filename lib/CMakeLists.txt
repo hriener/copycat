@@ -51,3 +51,8 @@ if (NOT TARGET percy)
   target_include_directories(percy INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/percy/include)
   target_link_libraries(percy INTERFACE kitty)
 endif()
+
+if (NOT TARGET json)
+  add_library(json INTERFACE)
+  target_include_directories(json INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/json/)
+endif()
