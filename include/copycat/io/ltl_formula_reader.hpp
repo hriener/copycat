@@ -24,7 +24,7 @@
  */
 
 /*!
-  \file ltl.hpp
+  \file ltl_formula_reader.hpp
   \brief LTL formula reader
 
   \author Heinz Riener
