@@ -54,6 +54,25 @@ public:
 		dirty,
 	};
 
+	static std::string to_string( states const& state )
+	{
+		switch (state)
+		{
+		case states::satisfiable:
+		  return "satisfiable";
+		case states::unsatisfiable:
+		  return "unsatisfiable";
+		case states::timeout:
+		  return "timeout";
+		case states::dirty:
+		  return "dirty";
+		case states::undefined:
+		default:
+		  return "undefined";
+		}
+	}
+
+#pragma region Constructors
 	result(states state = states::undefined)
 	    : state_(state)
 	{}
@@ -67,6 +86,7 @@ public:
 	    : state_(states::unsatisfiable)
 	    , data_(unsat_core)
 	{}
+#pragma endregion
 
 #pragma region Properties
 	inline bool is_satisfiable() const
@@ -94,6 +114,11 @@ public:
 	inline operator bool() const
 	{
 		return (state_ == states::satisfiable);
+	}
+
+	inline explicit operator std::string() const
+	{
+		return result::to_string(state_);
 	}
 #pragma endregion
 
