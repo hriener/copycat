@@ -123,6 +123,13 @@ public:
 #pragma endregion
 
 #pragma region Modifiers
+	void restart()
+	{
+		solver_.reset();
+		solver_ = std::make_unique<solver_type>();
+		state_ = result::states::undefined;
+	}
+
 	var_type add_variable()
 	{
 		return solver_->newVar();
@@ -256,6 +263,13 @@ public:
 #pragma endregion
 
 #pragma region Modifiers
+	void restart()
+	{
+		solver_.reset();
+		solver_ = std::make_unique<solver_type>();
+		state_ = result::states::undefined;
+	}
+
 	var_type add_variable()
 	{
 		return solver_->newVar();
@@ -389,6 +403,13 @@ public:
 #pragma endregion
 
 #pragma region Modifiers
+	void restart()
+	{
+		solver_.reset();
+		solver_ = std::make_unique<solver_type>();
+		state_ = result::states::undefined;
+	}
+
 	var_type add_variable()
 	{
 		return solver_->newVar();
