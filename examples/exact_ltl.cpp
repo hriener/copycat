@@ -89,7 +89,7 @@ public:
     /* clear the progress bar */
     std::cout << "                                                                           \r";
 
-    std::cout << "[i] bounded synthesis with " << num_nodes << std::endl;
+    std::cout << "[i] bounded synthesis with " << num_nodes << " node" << std::endl;
 
     copycat::ltl_encoder enc( solver );
 
@@ -118,20 +118,20 @@ public:
     instance["#nodes"] = num_nodes;
 
     bill::result::states result;
-    copycat::stopwatch<>::duration time_solving;
+    copycat::stopwatch<>::duration time_solving{0};
     {
       copycat::stopwatch watch( time_solving );
-      std::cout << "invoke solver" << std::endl;
       result = _ps.conflict_limit < 0 ? solver.solve() : solver.solve( /* no assumptions */{}, _ps.conflict_limit );
     }
-    std::cout << fmt::format( "[i] solver time = {}s\n", copycat::to_seconds( time_solving ) );
+    std::cout << fmt::format( "[i] solver: {} in {:5.2f}s\n",
+			      copycat::to_upper( bill::result::to_string( result ) ),
+			      copycat::to_seconds( time_solving ) );
 
     instance["time_solving"] = copycat::to_seconds( time_solving );
+    instance["result"] = bill::result::to_string( result );
 
     if ( result == bill::result::states::satisfiable )
     {
-      instance["result"] = "sat";
-
       std::stringstream chain_as_string;
       auto const& c = enc.extract_chain();
       copycat::write_chain( c, chain_as_string );
@@ -140,15 +140,8 @@ public:
       json.emplace_back( instance );
       return true; /* terminate loop */
     }
-    else if ( result == bill::result::states::undefined )
-    {
-      instance["result"] = "undefined";
-      json.emplace_back( instance );
-      return false; /* keep going */
-    }
     else
     {
-      instance["result"] = "unsat";
       json.emplace_back( instance );
       return false; /* keep going */
     }
