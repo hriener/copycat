@@ -92,6 +92,7 @@ public:
     std::cout << "[i] bounded synthesis with " << num_nodes << std::endl;
 
     copycat::ltl_encoder enc( solver );
+
     copycat::ltl_encoder_parameter enc_ps;
     enc_ps.verbose = false;
     enc_ps.num_nodes = num_nodes;
@@ -102,6 +103,9 @@ public:
       enc_ps.traces.emplace_back( t, true );
     for ( const auto& t : spec.bad_traces )
       enc_ps.traces.emplace_back( t, false );
+
+    /* restart the solver */
+    solver.restart();
 
     enc.encode( enc_ps );
     enc.allocate_variables();
@@ -117,8 +121,11 @@ public:
     copycat::stopwatch<>::duration time_solving;
     {
       copycat::stopwatch watch( time_solving );
+      std::cout << "invoke solver" << std::endl;
       result = _ps.conflict_limit < 0 ? solver.solve() : solver.solve( /* no assumptions */{}, _ps.conflict_limit );
     }
+    std::cout << fmt::format( "[i] solver time = {}s\n", copycat::to_seconds( time_solving ) );
+
     instance["time_solving"] = copycat::to_seconds( time_solving );
 
     if ( result == bill::result::states::satisfiable )
