@@ -114,6 +114,22 @@ public:
     os << " )*" << std::endl;
   }
 
+  uint32_t count_propositions() const
+  {
+    uint32_t num_props = 0u;
+    for ( const auto& d : _data )
+    {
+      for ( const auto& v : d )
+      {
+	if ( uint32_t( abs( v ) ) > num_props )
+	{
+	  num_props = abs( v );
+	}
+      }
+    }
+    return num_props;
+  }
+
 public:
   uint32_t _prefix_length = 0u;
   uint32_t _suffix_length = 0u;
