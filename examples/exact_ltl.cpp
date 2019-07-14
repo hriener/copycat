@@ -61,6 +61,11 @@ public:
     auto const parts = copycat::split_path( spec.name, { '/' } );
     entry["file"] = parts.at( parts.size() - 1u );
 
+    /* clear the progress bar */
+    std::cout << "                                                                           \r";
+
+    std::cout << "[i] problem instance: " << entry["file"] << std::endl;
+
     entry["#good_traces"] = spec.good_traces.size();
     entry["#bad_traces"] = spec.bad_traces.size();
     entry["has_op_params"] = spec.operators.size() > 0u ? true : false;
@@ -73,21 +78,26 @@ public:
       spec.bad_traces.size() > 0u ? spec.bad_traces.at( 0u ).count_propositions() : spec.good_traces.at( 0u ).count_propositions();
 
     /* bounded synthesis loop */
-    auto instances = nlohmann::json::array();
-    for ( uint32_t num_nodes = 1u; num_nodes <= _ps.max_num_nodes; ++num_nodes )
-      if ( exact_synthesis( spec, num_nodes, num_props, spec.operators, instances ) )
-        break;
+    copycat::stopwatch<>::duration time_total{0};
+    {
+      copycat::stopwatch watch( time_total );
 
-    entry["instances"] = instances;
+      auto instances = nlohmann::json::array();
+      for ( uint32_t num_nodes = 1u; num_nodes <= _ps.max_num_nodes; ++num_nodes )
+        if ( exact_synthesis( spec, num_nodes, num_props, spec.operators, instances ) )
+          break;
+
+      entry["instances"] = instances;
+    }
+    entry["total_time"] = copycat::to_seconds( time_total );
+    std::cout << fmt::format( "[i] total time: {:5.2f}s\n", copycat::to_seconds( time_total ) );
+
     _log.emplace_back( entry );
   }
 
   bool exact_synthesis( copycat::ltl_synthesis_spec const& spec, uint32_t num_nodes, uint32_t num_props, std::vector<copycat::operator_opcode> const& ops, nlohmann::json& json )
   {
     auto instance = nlohmann::json( {} );
-
-    /* clear the progress bar */
-    std::cout << "                                                                           \r";
 
     std::cout << "[i] bounded synthesis with " << num_nodes << " node" << std::endl;
 
@@ -124,8 +134,8 @@ public:
       result = _ps.conflict_limit < 0 ? solver.solve() : solver.solve( /* no assumptions */{}, _ps.conflict_limit );
     }
     std::cout << fmt::format( "[i] solver: {} in {:5.2f}s\n",
-			      copycat::to_upper( bill::result::to_string( result ) ),
-			      copycat::to_seconds( time_solving ) );
+                              copycat::to_upper( bill::result::to_string( result ) ),
+                              copycat::to_seconds( time_solving ) );
 
     instance["time_solving"] = copycat::to_seconds( time_solving );
     instance["result"] = bill::result::to_string( result );
@@ -188,15 +198,14 @@ int main( int argc, char* argv[] )
 
     nlohmann::json log = nlohmann::json::array();
 
-    auto count_benchmarks = 0u;
-    auto count = 0u;
+    auto progress_counter = 0u;
     for ( const auto& value : benchmarks )
     {
       /* print progress */
       std::cout << fmt::format( "[i] benchmarks = {} / {} ({:6.2f}%)\r",
-                                count_benchmarks, benchmarks.size(),
-                                ( 100.00*count_benchmarks )/double(benchmarks.size()) );
-      ++count_benchmarks;
+                                progress_counter, benchmarks.size(),
+                                ( 100.00*progress_counter )/double(benchmarks.size()) );
+      ++progress_counter;
       std::cout.flush();
 
       exact_ltl_engine engine( ps, log );
@@ -213,7 +222,6 @@ int main( int argc, char* argv[] )
         if ( spec.good_traces.size() > 5u || spec.bad_traces.size() > 5u ) // 105
           continue;
 
-        ++count;
         engine.run( spec );
       }
 
@@ -221,9 +229,6 @@ int main( int argc, char* argv[] )
       ofs << std::setw( 4 ) << log << std::endl;
       ofs.close();
     }
-
-    std::cout << "                                                                           \r";
-    std::cout << count << std::endl;
   }
 
   return 0;
