@@ -67,4 +67,14 @@ std::vector<std::string> split_path( std::string const& s, std::set<char> const&
   return result;
 }
 
+/*! \brief Convert string to upper case */
+std::string to_upper( std::string s )
+{
+  std::transform(
+    s.begin(), s.end(), s.begin(),
+    []( unsigned char c ){ return std::toupper( c ); }
+  );
+  return s;
+}
+
 } /* namespace copycat */
