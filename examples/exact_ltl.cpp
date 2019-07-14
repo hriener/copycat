@@ -1,11 +1,12 @@
+#include <bill/sat/solver.hpp>
+#include <copycat/algorithms/ltl_learner.hpp>
+#include <copycat/chain/print.hpp>
+#include <copycat/io/ltl_synthesis_spec_reader.hpp>
 #include <copycat/io/traces.hpp>
 #include <copycat/trace.hpp>
 #include <copycat/utils/read_json.hpp>
+#include <copycat/utils/stopwatch.hpp>
 #include <copycat/utils/string_utils.hpp>
-#include <copycat/io/ltl_synthesis_spec_reader.hpp>
-#include <copycat/algorithms/ltl_learner.hpp>
-#include <copycat/chain/print.hpp>
-#include <bill/sat/solver.hpp>
 #include <fmt/format.h>
 #include <iostream>
 #include <iomanip>
@@ -32,10 +33,19 @@ struct exact_ltl_parameters
 
   /* write statistics about the solving process into the log file */
   bool log_solving_stats = false;
+
+  /* maximum number of nodes to try bounded synthesis */
+  uint32_t max_num_nodes = 10u;
+
+  /* solver conflict limit */
+  int32_t conflict_limit = -1;
 }; /* exact_ltl_parameters */
 
 class exact_ltl_engine
 {
+public:
+  using solver_t = bill::solver<bill::solvers::glucose_41>;
+
 public:
   explicit exact_ltl_engine( exact_ltl_parameters const& ps, nlohmann::json& log )
     : _ps( ps )
@@ -64,108 +74,85 @@ public:
 
     /* bounded synthesis loop */
     auto instances = nlohmann::json::array();
-    for ( uint32_t num_nodes = 1u; num_nodes <= 10u; ++num_nodes )
-    {
-      auto instance = nlohmann::json( {} );
-
-      /* clear the progress bar */
-      std::cout << "                                                                           \r";
-
-      std::cout << "[i] bounded synthesis with " << num_nodes << std::endl;
-
-      using solver_t = bill::solver<bill::solvers::glucose_41>;
-      solver_t solver;
-      copycat::ltl_encoder enc( solver );
-
-      copycat::ltl_encoder_parameter ps;
-      ps.verbose = false;
-      ps.num_propositions = num_props;
-
-      std::vector<copycat::operator_opcode> ops;
-      for ( const auto& o : spec.operators )
-      {
-        if ( o == "!" )
-          ops.emplace_back( copycat::operator_opcode::not_ );
-        else if ( o == "&" )
-          ops.emplace_back( copycat::operator_opcode::and_ );
-        else if ( o == "|" )
-          ops.emplace_back( copycat::operator_opcode::or_ );
-        else if ( o == "->" )
-          ops.emplace_back( copycat::operator_opcode::implies_ );
-        else if ( o == "X" )
-          ops.emplace_back( copycat::operator_opcode::next_ );
-        else if ( o == "U" )
-          ops.emplace_back( copycat::operator_opcode::until_ );
-        else if ( o == "F" )
-          ops.emplace_back( copycat::operator_opcode::eventually_ );
-        else if ( o == "G" )
-          ops.emplace_back( copycat::operator_opcode::globally_ );
-        else
-        {
-          std::cout << fmt::format( "[w] unsupported operator `{}'\n", o );
-        }
-      }
-
-      /* default operator support */
-      if ( ops.size() == 0u )
-      {
-        ops.emplace_back( copycat::operator_opcode::not_ );
-        ops.emplace_back( copycat::operator_opcode::next_ );
-        ops.emplace_back( copycat::operator_opcode::and_ );
-        ops.emplace_back( copycat::operator_opcode::or_ );
-        ops.emplace_back( copycat::operator_opcode::implies_ );
-        ops.emplace_back( copycat::operator_opcode::until_ );
-        ops.emplace_back( copycat::operator_opcode::eventually_ );
-        ops.emplace_back( copycat::operator_opcode::globally_ );
-      }
-
-      ps.ops = ops;
-      ps.num_nodes = num_nodes;
-
-      for ( const auto& t : spec.good_traces )
-        ps.traces.emplace_back( std::make_pair( t, true ) );
-      for ( const auto& t : spec.bad_traces )
-        ps.traces.emplace_back( std::make_pair( t, false ) );
-
-      enc.encode( ps );
-      enc.allocate_variables();
-      // enc.print_allocated_variables();
-      enc.check_allocated_variables();
-      enc.create_clauses();
-
-      instance["#variables"] = solver.num_variables();
-      instance["#clauses"] = solver.num_clauses();
-      instance["#nodes"] = num_nodes;
-
-      auto const result = solver.solve();
-      if ( result == bill::result::states::satisfiable )
-      {
-        // std::cout << "SAT" << std::endl;
-
-        instance["result"] = "sat";
-
-        std::stringstream chain_as_string;
-        auto const& c = enc.extract_chain();
-        copycat::write_chain( c, chain_as_string );
-        instance["chain"] = chain_as_string.str();
-
-        instances.emplace_back( instance );
+    for ( uint32_t num_nodes = 1u; num_nodes <= _ps.max_num_nodes; ++num_nodes )
+      if ( exact_synthesis( spec, num_nodes, num_props, spec.operators, instances ) )
         break;
-      }
-      else
-      {
-        instance["result"] = "unsat";
-        instances.emplace_back( instance );
-      }
-    }
 
     entry["instances"] = instances;
     _log.emplace_back( entry );
   }
 
+  bool exact_synthesis( copycat::ltl_synthesis_spec const& spec, uint32_t num_nodes, uint32_t num_props, std::vector<copycat::operator_opcode> const& ops, nlohmann::json& json )
+  {
+    auto instance = nlohmann::json( {} );
+
+    /* clear the progress bar */
+    std::cout << "                                                                           \r";
+
+    std::cout << "[i] bounded synthesis with " << num_nodes << std::endl;
+
+    copycat::ltl_encoder enc( solver );
+    copycat::ltl_encoder_parameter enc_ps;
+    enc_ps.verbose = false;
+    enc_ps.num_nodes = num_nodes;
+    enc_ps.num_propositions = num_props;
+    enc_ps.ops = ops;
+
+    for ( const auto& t : spec.good_traces )
+      enc_ps.traces.emplace_back( t, true );
+    for ( const auto& t : spec.bad_traces )
+      enc_ps.traces.emplace_back( t, false );
+
+    enc.encode( enc_ps );
+    enc.allocate_variables();
+    // enc.print_allocated_variables();
+    enc.check_allocated_variables();
+    enc.create_clauses();
+
+    instance["#variables"] = solver.num_variables();
+    instance["#clauses"] = solver.num_clauses();
+    instance["#nodes"] = num_nodes;
+
+    bill::result::states result;
+    copycat::stopwatch<>::duration time_solving;
+    {
+      copycat::stopwatch watch( time_solving );
+      result = _ps.conflict_limit < 0 ? solver.solve() : solver.solve( /* no assumptions */{}, _ps.conflict_limit );
+    }
+    instance["time_solving"] = copycat::to_seconds( time_solving );
+
+    if ( result == bill::result::states::satisfiable )
+    {
+      instance["result"] = "sat";
+
+      std::stringstream chain_as_string;
+      auto const& c = enc.extract_chain();
+      copycat::write_chain( c, chain_as_string );
+      instance["chain"] = chain_as_string.str();
+
+      json.emplace_back( instance );
+      return true; /* terminate loop */
+    }
+    else if ( result == bill::result::states::undefined )
+    {
+      instance["result"] = "undefined";
+      json.emplace_back( instance );
+      return false; /* keep going */
+    }
+    else
+    {
+      instance["result"] = "unsat";
+      json.emplace_back( instance );
+      return false; /* keep going */
+    }
+  }
+
 protected:
   exact_ltl_parameters const& _ps;
   nlohmann::json& _log;
+
+  /* solver */
+  solver_t solver;
 }; /* exact_ltl_engine */
 
 int main( int argc, char* argv[] )
