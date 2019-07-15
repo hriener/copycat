@@ -62,6 +62,8 @@ public:
       return eval_conjunction( chain, trace, chain_node, trace_pos );
     else if ( label == "|" )
       return eval_disjunction( chain, trace, chain_node, trace_pos );
+    else if ( label == "->" )
+      return eval_implies( chain, trace, chain_node, trace_pos );
     else if ( label == "X" )
       return eval_next( chain, trace, chain_node, trace_pos );
     else if ( label == "G" )
@@ -109,6 +111,14 @@ public:
     auto const step = chain.step_at( chain_node );
     assert( step.size() == 2u );
     return eval_rec( chain, trace, step[0u], trace_pos ) || eval_rec( chain, trace, step[1u], trace_pos );
+  }
+
+  bool eval_implies( copycat::chain<std::string,std::vector<int>> const& chain, copycat::trace const& trace, uint32_t chain_node, uint32_t trace_pos ) const
+  {
+    // std::cout << "eval_implies: " << chain_node << std::endl;
+    auto const step = chain.step_at( chain_node );
+    assert( step.size() == 2u );
+    return ( !eval_rec( chain, trace, step[0u], trace_pos ) ) || eval_rec( chain, trace, step[1u], trace_pos );
   }
 
   bool eval_globally( copycat::chain<std::string,std::vector<int>> const& chain, copycat::trace const& trace, uint32_t chain_node, uint32_t trace_pos ) const
