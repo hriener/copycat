@@ -41,6 +41,163 @@ struct exact_ltl_parameters
   int32_t conflict_limit = -1;
 }; /* exact_ltl_parameters */
 
+class default_ltl_simulator
+{
+public:
+  explicit default_ltl_simulator() = default;
+
+  bool run( copycat::chain<std::string,std::vector<int>> const& chain, copycat::trace const& trace ) const
+  {
+    return eval_rec( chain, trace, chain.length(), 0u );
+  }
+
+  bool eval_rec( copycat::chain<std::string,std::vector<int>> const& chain, copycat::trace const& trace, uint32_t chain_node, uint32_t trace_pos ) const
+  {
+    auto const label = chain.label_at( chain_node );
+    if ( label.size() >= 1u && label[0u] == 'x' )
+      return eval_proposition( chain, trace, chain_node, trace_pos );
+    else if ( label == "~" )
+      return eval_negation( chain, trace, chain_node, trace_pos );
+    else if ( label == "&" )
+      return eval_conjunction( chain, trace, chain_node, trace_pos );
+    else if ( label == "|" )
+      return eval_disjunction( chain, trace, chain_node, trace_pos );
+    else if ( label == "X" )
+      return eval_next( chain, trace, chain_node, trace_pos );
+    else if ( label == "G" )
+      return eval_globally( chain, trace, chain_node, trace_pos );
+    else if ( label == "F" )
+      return eval_eventually( chain, trace, chain_node, trace_pos );
+    else if ( label == "U" )
+      return eval_until( chain, trace, chain_node, trace_pos );
+    else
+    {
+      std::cout << "[e] unsupported label " << label << std::endl;
+      assert( false );
+    }
+
+    return false;
+  }
+
+  bool eval_proposition( copycat::chain<std::string,std::vector<int>> const& chain, copycat::trace const& trace, uint32_t chain_node, uint32_t trace_pos ) const
+  {
+    // std::cout << "eval_proposition: " << chain_node << ' ' << trace_pos << std::endl;
+    auto const label = chain.label_at( chain_node );
+    auto const prop_id = std::atoi( label.substr( 1u ).c_str() );
+    return trace.has( trace_pos, prop_id+1 );
+  }
+
+  bool eval_negation( copycat::chain<std::string,std::vector<int>> const& chain, copycat::trace const& trace, uint32_t chain_node, uint32_t trace_pos ) const
+  {
+    // std::cout << "eval_negation: " << chain_node << std::endl;
+    auto const step = chain.step_at( chain_node );
+    assert( step.size() == 1u );
+    return !eval_rec( chain, trace, step[0u], trace_pos );
+  }
+
+  bool eval_conjunction( copycat::chain<std::string,std::vector<int>> const& chain, copycat::trace const& trace, uint32_t chain_node, uint32_t trace_pos ) const
+  {
+    // std::cout << "eval_conjunction: " << chain_node << std::endl;
+    auto const step = chain.step_at( chain_node );
+    assert( step.size() == 2u );
+    return eval_rec( chain, trace, step[0u], trace_pos ) && eval_rec( chain, trace, step[1u], trace_pos );
+  }
+
+  bool eval_disjunction( copycat::chain<std::string,std::vector<int>> const& chain, copycat::trace const& trace, uint32_t chain_node, uint32_t trace_pos ) const
+  {
+    // std::cout << "eval_disjunction: " << chain_node << std::endl;
+    auto const step = chain.step_at( chain_node );
+    assert( step.size() == 2u );
+    return eval_rec( chain, trace, step[0u], trace_pos ) || eval_rec( chain, trace, step[1u], trace_pos );
+  }
+
+  bool eval_globally( copycat::chain<std::string,std::vector<int>> const& chain, copycat::trace const& trace, uint32_t chain_node, uint32_t trace_pos ) const
+  {
+    // std::cout << "eval_globally: " << chain_node << std::endl;
+    auto const step = chain.step_at( chain_node );
+    assert( step.size() == 1u );
+
+    uint32_t start_pos = trace_pos < trace.prefix_length() ? trace_pos : trace.prefix_length();
+    for ( auto i = start_pos; i < trace.length(); ++i )
+    {
+      if ( !eval_rec( chain, trace, step[0u], i ) )
+      {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  bool eval_eventually( copycat::chain<std::string,std::vector<int>> const& chain, copycat::trace const& trace, uint32_t chain_node, uint32_t trace_pos ) const
+  {
+    // std::cout << "eval_eventually: " << chain_node << std::endl;
+    auto const step = chain.step_at( chain_node );
+    assert( step.size() == 1u );
+
+    uint32_t start_pos = trace_pos < trace.prefix_length() ? trace_pos : trace.prefix_length();
+    for ( auto i = start_pos; i < trace.length(); ++i )
+    {
+      if ( eval_rec( chain, trace, step[0u], i ) )
+      {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  bool eval_next( copycat::chain<std::string,std::vector<int>> const& chain, copycat::trace const& trace, uint32_t chain_node, uint32_t trace_pos ) const
+  {
+    // std::cout << "eval_next: " << chain_node << std::endl;
+    auto const step = chain.step_at( chain_node );
+    assert( step.size() == 1u );
+    if ( trace_pos == trace.length() - 1u )
+      return eval_rec( chain, trace, step[0u], trace.prefix_length() );
+    else
+      return eval_rec( chain, trace, step[0u], trace_pos + 1u );
+  }
+
+  bool eval_until( copycat::chain<std::string,std::vector<int>> const& chain, copycat::trace const& trace, uint32_t chain_node, uint32_t trace_pos ) const
+  {
+    // std::cout << "eval_until: " << chain_node << std::endl;
+    auto const step = chain.step_at( chain_node );
+    assert( step.size() == 2u );
+    return eval_rec( chain, trace, step[1u], trace_pos ) || ( eval_rec( chain, trace, step[0u], trace_pos ) && eval_rec( chain, trace, chain_node, trace_pos + 1 ) );
+  }
+}; /* ltl_default_simulator */
+
+template<class Simulator = default_ltl_simulator>
+bool simulate( copycat::chain<std::string,std::vector<int>> const& c, copycat::trace const& trace, Simulator const& sim = Simulator() )
+{
+  return sim.run( c, trace );
+}
+
+bool simulate( copycat::chain<std::string,std::vector<int>> const& c, copycat::ltl_synthesis_spec const& spec )
+{
+  for ( const auto& g : spec.good_traces )
+  {
+    // std::cout << "good trace "; g.print();
+    if ( !simulate( c, g ) )
+    {
+      std::cout << "false" << std::endl;
+      return false;
+    }
+  }
+
+  for ( const auto& b : spec.bad_traces )
+  {
+    // std::cout << "bad trace "; b.print();
+    if ( simulate( c, b ) )
+    {
+      std::cout << "false" << std::endl;
+      return false;
+    }
+  }
+
+  return true;
+}
+
 class exact_ltl_engine
 {
 public:
@@ -66,16 +223,15 @@ public:
 
     std::cout << "[i] problem instance: " << entry["file"] << std::endl;
 
+    /* determine number of propositions */
+    assert( spec.good_traces.size() + spec.bad_traces.size() > 0u );
+
     entry["#good_traces"] = spec.good_traces.size();
     entry["#bad_traces"] = spec.bad_traces.size();
     entry["has_op_params"] = spec.operators.size() > 0u ? true : false;
     entry["has_cost_params"] = spec.parameters.size() > 0u ? true : false;
     entry["has_verify_params"] = spec.formulas.size() > 0u ? true : false;
-
-    /* determine number of propositions */
-    assert( spec.good_traces.size() + spec.bad_traces.size() > 0u );
-    auto const num_props =
-      spec.bad_traces.size() > 0u ? spec.bad_traces.at( 0u ).count_propositions() : spec.good_traces.at( 0u ).count_propositions();
+    entry["num_propositions"] = spec.num_propositions;
 
     /* bounded synthesis loop */
     copycat::stopwatch<>::duration time_total{0};
@@ -84,18 +240,18 @@ public:
 
       auto instances = nlohmann::json::array();
       for ( uint32_t num_nodes = 1u; num_nodes <= _ps.max_num_nodes; ++num_nodes )
-        if ( exact_synthesis( spec, num_nodes, num_props, spec.operators, instances ) )
+        if ( exact_synthesis( spec, num_nodes, instances ) )
           break;
 
       entry["instances"] = instances;
     }
-    entry["total_time"] = copycat::to_seconds( time_total );
-    std::cout << fmt::format( "[i] total time: {:5.2f}s\n", copycat::to_seconds( time_total ) );
+    entry["total_time"] = fmt::format( "{:8.2f}", copycat::to_seconds( time_total ) );
+    std::cout << fmt::format( "[i] total time: {:8.2f}s\n", copycat::to_seconds( time_total ) );
 
     _log.emplace_back( entry );
   }
 
-  bool exact_synthesis( copycat::ltl_synthesis_spec const& spec, uint32_t num_nodes, uint32_t num_props, std::vector<copycat::operator_opcode> const& ops, nlohmann::json& json )
+  bool exact_synthesis( copycat::ltl_synthesis_spec const& spec, uint32_t num_nodes, nlohmann::json& json )
   {
     auto instance = nlohmann::json( {} );
 
@@ -106,8 +262,8 @@ public:
     copycat::ltl_encoder_parameter enc_ps;
     enc_ps.verbose = false;
     enc_ps.num_nodes = num_nodes;
-    enc_ps.num_propositions = num_props;
-    enc_ps.ops = ops;
+    enc_ps.num_propositions = spec.num_propositions;
+    enc_ps.ops = spec.operators;
 
     for ( const auto& t : spec.good_traces )
       enc_ps.traces.emplace_back( t, true );
@@ -133,13 +289,14 @@ public:
       copycat::stopwatch watch( time_solving );
       result = _ps.conflict_limit < 0 ? solver.solve() : solver.solve( /* no assumptions */{}, _ps.conflict_limit );
     }
-    std::cout << fmt::format( "[i] solver: {} in {:5.2f}s\n",
+    std::cout << fmt::format( "[i] solver: {} in {:8.2f}s\n",
                               copycat::to_upper( bill::result::to_string( result ) ),
                               copycat::to_seconds( time_solving ) );
 
-    instance["time_solving"] = copycat::to_seconds( time_solving );
+    instance["time_solving"] = fmt::format( "{:8.2f}", copycat::to_seconds( time_solving ) );
     instance["result"] = bill::result::to_string( result );
 
+    bool return_value = false; /* keep going with loop */
     if ( result == bill::result::states::satisfiable )
     {
       std::stringstream chain_as_string;
@@ -147,14 +304,16 @@ public:
       copycat::write_chain( c, chain_as_string );
       instance["chain"] = chain_as_string.str();
 
-      json.emplace_back( instance );
-      return true; /* terminate loop */
+      copycat::write_chain( c );
+
+      auto const sim_result = simulate( c, spec );
+      std::cout << "[i] simulate: " << ( sim_result ? "verified" : "failed" ) << std::endl;
+      instance["verified"] = sim_result;
+
+      return_value = true; /* terminate loop */
     }
-    else
-    {
-      json.emplace_back( instance );
-      return false; /* keep going */
-    }
+    json.emplace_back( instance );
+    return return_value;
   }
 
 protected:
