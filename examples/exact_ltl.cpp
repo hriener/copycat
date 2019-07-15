@@ -163,7 +163,42 @@ public:
     // std::cout << "eval_until: " << chain_node << std::endl;
     auto const step = chain.step_at( chain_node );
     assert( step.size() == 2u );
-    return eval_rec( chain, trace, step[1u], trace_pos ) || ( eval_rec( chain, trace, step[0u], trace_pos ) && eval_rec( chain, trace, chain_node, trace_pos + 1 ) );
+
+    auto start_pos = trace_pos;
+    while ( start_pos < trace.length() )
+    {
+
+      /* find a position at which step[1u] is satisfied */
+      int32_t pos = -1;
+      for ( int32_t i = start_pos; i < int32_t( trace.length() ); ++i )
+      {
+        if ( eval_rec( chain, trace, step[1u], i ) )
+        {
+          pos = int32_t( i );
+          break;
+        }
+      }
+
+      if ( pos == -1 )
+        return false;
+
+      /* check if step[0u] is true before */
+      bool all_true = true;
+      for ( int32_t j = trace_pos; j < pos; ++j )
+      {
+        all_true &= eval_rec( chain, trace, step[0u], j );
+        if ( !all_true )
+          break;
+      }
+
+      if ( all_true )
+        return true;
+
+      start_pos = pos + 1;
+    }
+    return false;
+
+    // return eval_rec( chain, trace, step[1u], trace_pos ) || ( eval_rec( chain, trace, step[0u], trace_pos ) && eval_rec( chain, trace, chain_node, trace_pos + 1 ) );
   }
 }; /* ltl_default_simulator */
 
@@ -180,7 +215,6 @@ bool simulate( copycat::chain<std::string,std::vector<int>> const& c, copycat::l
     // std::cout << "good trace "; g.print();
     if ( !simulate( c, g ) )
     {
-      std::cout << "false" << std::endl;
       return false;
     }
   }
@@ -190,7 +224,6 @@ bool simulate( copycat::chain<std::string,std::vector<int>> const& c, copycat::l
     // std::cout << "bad trace "; b.print();
     if ( simulate( c, b ) )
     {
-      std::cout << "false" << std::endl;
       return false;
     }
   }
