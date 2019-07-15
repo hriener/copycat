@@ -175,11 +175,13 @@ public:
     assert( step.size() == 2u );
 
     auto start_pos = trace_pos;
+    int32_t pos;
+
     while ( start_pos < trace.length() )
     {
+      pos = -1;
 
       /* find a position at which step[1u] is satisfied */
-      int32_t pos = -1;
       for ( int32_t i = start_pos; i < int32_t( trace.length() ); ++i )
       {
         if ( eval_rec( chain, trace, step[1u], i ) )
@@ -190,7 +192,7 @@ public:
       }
 
       if ( pos == -1 )
-        return false;
+        break;
 
       /* check if step[0u] is true before */
       bool all_true = true;
@@ -206,7 +208,40 @@ public:
 
       start_pos = pos + 1;
     }
-    return false;
+
+    /* if we cannot find a positions and we are already looking in the suffix, then
+       look in the suffix before the current position */
+    if ( pos == -1 && trace_pos >= trace.prefix_length() )
+    {
+      for ( uint32_t i = trace.prefix_length(); i < trace_pos; ++i )
+      {
+        if ( eval_rec( chain, trace, step[1u], i ) )
+        {
+          pos = int32_t( i );
+          break;
+        }
+      }
+    }
+
+    if ( pos == -1 )
+      return false;
+
+    /* check if step[0u] is true before */
+    bool all_true = true;
+    for ( uint32_t j = trace_pos; j < trace.length(); ++j )
+    {
+      all_true &= eval_rec( chain, trace, step[0u], j );
+      if ( !all_true )
+        return false;
+    }
+    for ( int32_t j = trace.prefix_length(); j < pos; ++j )
+    {
+      all_true &= eval_rec( chain, trace, step[0u], j );
+      if ( !all_true )
+        return false;
+    }
+
+    return true;
 
     // return eval_rec( chain, trace, step[1u], trace_pos ) || ( eval_rec( chain, trace, step[0u], trace_pos ) && eval_rec( chain, trace, chain_node, trace_pos + 1 ) );
   }
