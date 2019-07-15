@@ -561,7 +561,7 @@ public:
             auto const prefix_length = traces.at( trace_index ).first.prefix_length();
             auto const t_eq = add_tseytin_equals(
               trace_lit( trace_index, root_index, trace_length-1u ),
-              prefix_length > 0u ? trace_lit( trace_index, child_index, prefix_length - 1u ) : trace_lit( trace_index, child_index, 0u ) );
+              prefix_length > 0u ? trace_lit( trace_index, child_index, prefix_length ) : trace_lit( trace_index, child_index, 0u ) );
             equals.emplace_back( t_eq );
 
             auto const t_and = add_tseytin_and( equals );
