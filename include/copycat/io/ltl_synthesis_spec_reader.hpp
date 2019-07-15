@@ -49,6 +49,7 @@ struct ltl_synthesis_spec
   std::vector<operator_opcode> operators;
   std::vector<std::string> parameters;
   std::vector<std::string> formulas;
+  uint32_t num_propositions = 0u;
 }; /* ltl_synthesis_spec */
 
 class ltl_synthesis_spec_reader : public trace_reader
@@ -73,6 +74,11 @@ public:
       _spec.operators.emplace_back( copycat::operator_opcode::eventually_ );
       _spec.operators.emplace_back( copycat::operator_opcode::globally_ );
     }
+  }
+
+  virtual void set_num_propositions( uint32_t num_propositions ) const override
+  {
+    _spec.num_propositions = num_propositions;
   }
 
   void on_good_trace( std::vector<std::vector<int>> const& prefix,

@@ -51,6 +51,11 @@ class trace_reader
 public:
   trace_reader() = default;
 
+  virtual void set_num_propositions( uint32_t num_propositions ) const
+  {
+    (void)num_propositions;
+  }
+
   virtual void on_good_trace( std::vector<std::vector<int>> const& prefix,
                               std::vector<std::vector<int>> const& suffix ) const
   {
@@ -147,7 +152,7 @@ namespace detail
     return input_string.substr( beg, range );
   }
 
-  std::vector<std::vector<int>> parse_trace( std::string const& trace_string )
+  std::vector<std::vector<int>> parse_trace( std::string const& trace_string, uint32_t& num_propositions )
   {
     std::vector<std::vector<int>> trace_data;
     auto const time_steps = split_string( trace_string, ";" );
@@ -160,6 +165,8 @@ namespace detail
         if ( signals.at( i ) == "1" )
         {
           signal_data.emplace_back( i + 1 );
+          if ( num_propositions < i + 1 )
+            num_propositions = i + 1;
         }
       }
       trace_data.emplace_back( signal_data );
@@ -173,6 +180,8 @@ bool read_traces( std::istream& is, trace_reader const& reader )
   using trace_t = std::vector<std::vector<int>>;
 
   trace_parser parser;
+
+  uint32_t num_propositions = 0u;
   auto const good_section = parser.create_section( "Good traces", 1u );
   auto const bad_section = parser.create_section( "Bad traces", 2u );
   auto const operator_section = parser.create_section( "Operators", 3u );
@@ -199,7 +208,7 @@ bool read_traces( std::istream& is, trace_reader const& reader )
         assert( affixes.size() <= 2u );
 
         auto const lasso_start = affixes.size() >= 2u ? std::atoi( affixes[1u].c_str() ) : 0u;
-        trace_t const t = detail::parse_trace( affixes[0u] );
+        trace_t const t = detail::parse_trace( affixes[0u], num_propositions );
         assert( lasso_start < t.size() );
 
         if ( lasso_start > 0u )
@@ -220,7 +229,7 @@ bool read_traces( std::istream& is, trace_reader const& reader )
         assert( affixes.size() <= 2u );
 
         auto const lasso_start = affixes.size() >= 2u ? std::atoi( affixes[1u].c_str() ) : 0u;
-        trace_t const t = detail::parse_trace( affixes[0u] );
+        trace_t const t = detail::parse_trace( affixes[0u], num_propositions );
         assert( lasso_start < t.size() );
 
         if ( lasso_start > 0u )
@@ -255,6 +264,7 @@ bool read_traces( std::istream& is, trace_reader const& reader )
       }
     }
   }
+  reader.set_num_propositions( num_propositions );
   return true;
 }
 
