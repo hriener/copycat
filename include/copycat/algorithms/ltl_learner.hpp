@@ -39,9 +39,22 @@
 #include <fmt/format.h>
 #include <unordered_map>
 #include <iostream>
+#include <array>
 
 namespace copycat
 {
+
+namespace detail
+{
+
+template <class T>
+inline void hash_combine( uint64_t &seed, T const& v )
+{
+  std::hash<T> hasher;
+  seed ^= hasher( v ) + 0x9e3779b9 + ( seed << 6 ) + ( seed >> 2 );
+}
+
+} /* detail */
 
 enum class operator_opcode : uint32_t
 {
@@ -114,12 +127,37 @@ template<typename Solver>
 class ltl_encoder
 {
 public:
+  struct lit_vector_hash
+  {
+    std::size_t operator()( std::vector<bill::lit_type> const& vs ) const
+    {
+      uint64_t seed = 0u;
+      for ( auto const& v : vs )
+      {
+        detail::hash_combine( seed, uint32_t( v ) );
+      }
+      return seed;
+    }
+  }; /* compute_table_hash */
+
+  struct lit_array2_hash
+  {
+    std::size_t operator()( std::array<bill::lit_type, 2u> const& vs ) const
+    {
+      uint64_t seed = 0u;
+      detail::hash_combine( seed, uint32_t( vs.at( 0u ) ) );
+      detail::hash_combine( seed, uint32_t( vs.at( 1u ) ) );
+      return seed;
+    }
+  }; /* compute_table_hash */
+
+public:
   ltl_encoder( Solver& solver )
     : _solver( solver )
   {
   }
 
-  /*! \brief Encode paramters */
+  /*! \brief Encode parameters */
   void encode( ltl_encoder_parameter const& ps )
   {
     verbose = ps.verbose;
@@ -887,14 +925,23 @@ private:
     return r;
   }
 
-  bill::lit_type add_tseytin_and(std::vector<bill::lit_type> const& ls)
+  bill::lit_type add_tseytin_and( std::vector<bill::lit_type> const& ls )
   {
     assert( ls.size() > 0u );
 
     if ( ls.size() == 1u )
       return ls[0u];
+    
+    if ( ls.size() == 2u )
+      return add_tseytin_and( ls[0u], ls[1u] );
 
+    /* lookup in compute table */
+    auto const it = and_compute_table.find( ls );
+    if ( it != and_compute_table.end() )
+      return it->second;
+    
     auto const r = add_variable();
+
     std::vector<bill::lit_type> cls;
     for ( const auto& l : ls )
       cls.emplace_back(~l);
@@ -902,10 +949,14 @@ private:
     add_clause(cls);
     for ( const auto& l : ls )
       add_clause(std::vector{l, ~r});
+
+    /* insert into compute table */
+    and_compute_table.emplace( ls, r );
+    
     return r;
   }
 
-  bill::lit_type add_tseytin_or(bill::lit_type const& a, bill::lit_type const& b)
+  bill::lit_type add_tseytin_or( bill::lit_type const& a, bill::lit_type const& b )
   {
     auto const r = add_variable();
     add_clause(std::vector{a, b, ~r});
@@ -914,56 +965,63 @@ private:
     return r;
   }
 
-  bill::lit_type add_tseytin_or(std::vector<bill::lit_type> const& ls)
+  bill::lit_type add_tseytin_or( std::vector<bill::lit_type> const& ls )
   {
     assert( ls.size() > 0u );
 
     if ( ls.size() == 1u )
       return ls[0u];
 
+    if ( ls.size() == 2u )
+      return add_tseytin_or( ls[0u], ls[1u] );
+
+    /* lookup in compute table */
+    auto const it = or_compute_table.find( ls );
+    if ( it != or_compute_table.end() )
+      return it->second;
+
     auto const r = add_variable();
+
     std::vector<bill::lit_type> cls(ls);
     cls.emplace_back(~r);
     add_clause(cls);
     for ( const auto& l : ls )
       add_clause(std::vector{~l, r});
+
+    /* insert into compute table */
+    or_compute_table.emplace( ls, r );
+
     return r;
   }
 
-  bill::lit_type add_tseytin_equals(bill::lit_type const& a, bill::lit_type const& b)
+  bill::lit_type add_tseytin_equals( bill::lit_type const& a, bill::lit_type const& b )
   {
+    /* lookup in compute table */
+    std::array<bill::lit_type, 2u> key{a,b};
+    auto const it = equals_compute_table.find( key );
+    if ( it != equals_compute_table.end() )
+      return it->second;
+
     auto const r = add_variable();
+
     add_clause(std::vector{~a, ~b, r});
     add_clause(std::vector{~a, b, ~r});
     add_clause(std::vector{a, ~b, ~r});
     add_clause(std::vector{a, b, r});
+
+    /* insert into compute table */
+    equals_compute_table.emplace( key, r );
+
     return r;
   }
 
-  bill::lit_type add_variable( bill::lit_type::polarities pol = bill::lit_type::polarities::positive, std::string const& note = "" )
+  bill::lit_type add_variable( bill::lit_type::polarities pol = bill::lit_type::polarities::positive )
   {
-    auto const r = _solver.add_variable();
-    if ( verbose )
-      std::cout << fmt::format( "[i] add_variable {}: {}\n", note, uint32_t( r ) );
-    return bill::lit_type( r, pol );
+    return bill::lit_type( _solver.add_variable(), pol );
   }
 
-  void add_clause( std::vector<bill::lit_type> const& clause, std::string const& note = "")
+  void add_clause( std::vector<bill::lit_type> const& clause )
   {
-    if ( verbose )
-    {
-      std::cout << fmt::format( "[i] add_clause {}: ", note );
-      for ( auto const& lit : clause )
-      {
-        if ( lit.is_complemented() )
-        {
-          std::cout << '~';
-        }
-        std::cout << uint32_t( lit.variable() ) << ' ';
-      }
-      std::cout << "\n";
-    }
-
     _solver.add_clause( clause );
   }
 
@@ -980,6 +1038,11 @@ private:
 
   /* operator to label */
   std::unordered_map<operator_opcode, uint32_t> operator_to_label;
+
+  /* compute tables */
+  std::unordered_map<std::vector<bill::lit_type>, bill::lit_type, lit_vector_hash> and_compute_table;
+  std::unordered_map<std::vector<bill::lit_type>, bill::lit_type, lit_vector_hash> or_compute_table;
+  std::unordered_map<std::array<bill::lit_type, 2u>, bill::lit_type, lit_array2_hash> equals_compute_table;
 
   uint32_t label_var_begin;
   uint32_t label_var_end;
