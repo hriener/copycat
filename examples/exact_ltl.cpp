@@ -35,10 +35,13 @@ struct exact_ltl_parameters
   bool log_solving_stats = false;
 
   /* maximum number of nodes to try bounded synthesis */
-  uint32_t max_num_nodes = 10u;
+  uint32_t max_num_nodes = 8u;
 
   /* solver conflict limit */
   int32_t conflict_limit = -1;
+
+  /* be verbose? */
+  bool verbose = false;
 }; /* exact_ltl_parameters */
 
 class default_ltl_simulator
@@ -338,7 +341,7 @@ public:
     copycat::ltl_encoder enc( solver );
 
     copycat::ltl_encoder_parameter enc_ps;
-    enc_ps.verbose = false;
+    enc_ps.verbose = _ps.verbose;
     enc_ps.num_nodes = num_nodes;
     enc_ps.num_propositions = spec.num_propositions;
     enc_ps.ops = spec.operators;
@@ -428,6 +431,10 @@ int main( int argc, char* argv[] )
     ps.log_constraint_stats = config["log_constraint_stats"].get<bool>();
   if ( config.count( "log_solving_stats" ) )
     ps.log_solving_stats = config["log_solving_stats"].get<bool>();
+  if ( config.count( "verbose" ) )
+    ps.verbose = config["verbose"].get<bool>();
+  if ( config.count( "max_num_nodes" ) )
+    ps.max_num_nodes = config["max_num_nodes"].get<uint32_t>();
 
   if ( config.count( "benchmarks" ) )
   {
