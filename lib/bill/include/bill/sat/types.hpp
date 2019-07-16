@@ -99,6 +99,11 @@ public:
 #pragma endregion
 
 #pragma region Overloads
+	constexpr operator uint32_t() const
+	{
+		return data_;
+	}
+
 	lit_type operator~() const
 	{
 		lit_type complemented(*this);
