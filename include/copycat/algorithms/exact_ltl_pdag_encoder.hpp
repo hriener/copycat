@@ -584,6 +584,35 @@ private:
     }
   }
 
+  std::vector<uint32_t> positions_between( uint32_t time_index, uint32_t another_time_index, uint32_t prefix_length, uint32_t trace_length )
+  {
+    std::vector<uint32_t> pos;
+    if ( time_index < another_time_index )
+    {
+      for ( auto i = time_index; i < another_time_index; ++i )
+      {
+        pos.emplace_back( i );
+      }
+    }
+    else if ( time_index == another_time_index )
+    {
+      return {};
+    }
+    else
+    {
+      for ( auto i = prefix_length; i < another_time_index; ++i )
+      {
+        pos.emplace_back( i );
+      }
+      for ( auto i = time_index; i < trace_length; ++i )
+      {
+        pos.emplace_back( i );
+      }
+    }
+
+    return pos;
+  }
+
   /*! \brief Create clauses */
   void create_clauses()
   {
@@ -797,6 +826,64 @@ private:
       }
     }
 
+    if ( std::find( std::begin( _ps.ops ), std::end( _ps.ops ), operator_opcode::implies_ ) != std::end( _ps.ops ) )
+    {
+      for ( uint32_t trace_index = 0u; trace_index < _ps.traces.size(); ++trace_index )
+      {
+        for ( uint32_t vertex_index = uint32_t( _ps.pd.nr_pi_fanins() ); vertex_index < _num_vertices; ++vertex_index )
+        {
+          if ( get_vertex_type( vertex_index ) != vertex_type::mixed && get_vertex_type( vertex_index ) != vertex_type::binary )
+            continue;
+
+          auto label_index = 0;
+
+          /* find label index */
+          if ( get_vertex_type( vertex_index ) == vertex_type::mixed )
+          {
+            for ( const auto& m : mixed_operators )
+            {
+              if ( m == operator_opcode::implies_ )
+                break;
+              else
+                label_index++;
+            }
+          }
+          else if ( get_vertex_type( vertex_index ) == vertex_type::binary )
+          {
+            for ( const auto& m : binary_operators )
+            {
+              if ( m == operator_opcode::implies_ )
+                break;
+              else
+                label_index++;
+            }
+          }
+
+          auto const left_dag_index = _ps.pd.get_vertex( vertex_index - _ps.pd.nr_pi_fanins() )[0u];
+          auto const right_dag_index = _ps.pd.get_vertex( vertex_index - _ps.pd.nr_pi_fanins() )[1u];
+
+          auto const child_index0 =
+            left_dag_index == 0u ? zeroes.at( vertex_index - _ps.pd.nr_pi_fanins() ) : uint32_t( _ps.pd.nr_pi_fanins() ) + left_dag_index - 1u;
+          auto const child_index1 =
+            right_dag_index == 0u ? zeroes.at( vertex_index - _ps.pd.nr_pi_fanins() ) + ( left_dag_index == 0u ? 1u : 0u ) : uint32_t( _ps.pd.nr_pi_fanins() ) + right_dag_index - 1u;
+          assert( vertex_index > child_index0 );
+          assert( vertex_index > child_index1 );
+
+          auto const t = label( vertex_index, label_index );
+
+          std::vector<bill::lit_type> equals;
+          for ( auto time_index = 0u; time_index < _ps.traces.at( trace_index ).first.length(); ++time_index )
+          {
+            auto const t_implies = add_tseytin_or( ~trace( child_index0, trace_index, time_index ), trace( child_index1, trace_index, time_index ) );
+            auto const t_eq = add_tseytin_equals( trace( vertex_index, trace_index, time_index ), t_implies );
+            equals.emplace_back( t_eq );
+          }
+          auto const t_and = add_tseytin_and( equals );
+          add_clause( { ~t, t_and } );
+        }
+      }
+    }
+
     /* temporal operators: X, U, G, F */
     if ( std::find( std::begin( _ps.ops ), std::end( _ps.ops ), operator_opcode::next_ ) != std::end( _ps.ops ) )
     {
@@ -839,6 +926,196 @@ private:
 
           auto const t_and = add_tseytin_and( equals );
           add_clause( { ~t, t_and } );
+        }
+      }
+    }
+
+    /* eventually */
+    if ( std::find( std::begin( _ps.ops ), std::end( _ps.ops ), operator_opcode::eventually_ ) != std::end( _ps.ops ) )
+    {
+      for ( uint32_t trace_index = 0u; trace_index < _ps.traces.size(); ++trace_index )
+      {
+        for ( uint32_t vertex_index = uint32_t( _ps.pd.nr_pi_fanins() ); vertex_index < _num_vertices; ++vertex_index )
+        {
+          if ( get_vertex_type( vertex_index ) != vertex_type::mixed ) continue;
+
+          /* find label index */
+          auto label_index = 0;
+          for ( const auto& m : mixed_operators )
+          {
+            if ( m == operator_opcode::eventually_ )
+              break;
+            else
+              label_index++;
+          }
+
+          auto const left_dag_index = _ps.pd.get_vertex( vertex_index - _ps.pd.nr_pi_fanins() )[0u];
+          auto const child_index =
+            left_dag_index == 0u ? zeroes.at( vertex_index - _ps.pd.nr_pi_fanins() ) : uint32_t( _ps.pd.nr_pi_fanins() ) + left_dag_index - 1u;
+          assert( child_index < vertex_index );
+
+          auto const t = label( vertex_index, label_index );
+
+          auto const prefix_length = _ps.traces.at( trace_index ).first.prefix_length();
+          auto const trace_length = _ps.traces.at( trace_index ).first.length();
+
+          std::vector<bill::lit_type> bs;
+          for ( auto time_index = 0u; time_index < trace_length; ++time_index )
+          {
+            std::vector<bill::lit_type> as;
+            for ( auto another_time_index = time_index; another_time_index < trace_length; ++another_time_index )
+              as.emplace_back( trace( child_index, trace_index, another_time_index ) );
+            bs.emplace_back( add_tseytin_equals( trace( vertex_index, trace_index, time_index ), add_tseytin_or( as ) ) );
+          }
+          auto const prefix_part = add_tseytin_and( bs );
+
+          std::vector<bill::lit_type> cs;
+          for ( auto time_index = prefix_length; time_index < trace_length; ++time_index )
+          {
+            std::vector<bill::lit_type> as;
+            for ( auto another_time_index = prefix_length; another_time_index < trace_length; ++another_time_index )
+              as.emplace_back( trace( child_index, trace_index, another_time_index ) );
+            cs.emplace_back( add_tseytin_equals( trace( vertex_index, trace_index, time_index ), add_tseytin_or( as ) ) );
+          }
+          auto const postfix_part = add_tseytin_and( cs );
+
+          add_clause( { ~t, add_tseytin_and( prefix_part, postfix_part ) } );
+        }
+      }
+    }
+
+    /* globally */
+    if ( std::find( std::begin( _ps.ops ), std::end( _ps.ops ), operator_opcode::globally_ ) != std::end( _ps.ops ) )
+    {
+      for ( uint32_t trace_index = 0u; trace_index < _ps.traces.size(); ++trace_index )
+      {
+        for ( uint32_t vertex_index = uint32_t( _ps.pd.nr_pi_fanins() ); vertex_index < _num_vertices; ++vertex_index )
+        {
+          if ( get_vertex_type( vertex_index ) != vertex_type::mixed ) continue;
+
+          /* find label index */
+          auto label_index = 0;
+          for ( const auto& m : mixed_operators )
+          {
+            if ( m == operator_opcode::globally_ )
+              break;
+            else
+              label_index++;
+          }
+
+          auto const left_dag_index = _ps.pd.get_vertex( vertex_index - _ps.pd.nr_pi_fanins() )[0u];
+          auto const child_index =
+            left_dag_index == 0u ? zeroes.at( vertex_index - _ps.pd.nr_pi_fanins() ) : uint32_t( _ps.pd.nr_pi_fanins() ) + left_dag_index - 1u;
+          assert( child_index < vertex_index );
+
+          auto const t = label( vertex_index, label_index );
+
+          auto const prefix_length = _ps.traces.at( trace_index ).first.prefix_length();
+          auto const trace_length = _ps.traces.at( trace_index ).first.length();
+
+          std::vector<bill::lit_type> bs;
+          for ( auto time_index = 0u; time_index < trace_length; ++time_index )
+          {
+            std::vector<bill::lit_type> as;
+            for ( auto another_time_index = time_index; another_time_index < trace_length; ++another_time_index )
+              as.emplace_back( trace( child_index, trace_index, another_time_index ) );
+            bs.emplace_back( add_tseytin_equals( trace( vertex_index, trace_index, time_index ), add_tseytin_and( as ) ) );
+          }
+          auto const prefix_part = add_tseytin_and( bs );
+
+          std::vector<bill::lit_type> cs;
+          for ( auto time_index = prefix_length; time_index < trace_length; ++time_index )
+          {
+            std::vector<bill::lit_type> as;
+            for ( auto another_time_index = prefix_length; another_time_index < trace_length; ++another_time_index )
+              as.emplace_back( trace( child_index, trace_index, time_index ) );
+            cs.emplace_back( add_tseytin_equals( trace( vertex_index, trace_index, time_index ), add_tseytin_and( as ) ) );
+          }
+          auto const postfix_part = add_tseytin_and( cs );
+
+          add_clause( { ~t, add_tseytin_and( prefix_part, postfix_part ) } );
+        }
+      }
+    }
+
+    /* operator: until */
+    if ( std::find( std::begin( _ps.ops ), std::end( _ps.ops ), operator_opcode::until_ ) != std::end( _ps.ops ) )
+    {
+      for ( uint32_t trace_index = 0u; trace_index < _ps.traces.size(); ++trace_index )
+      {
+        for ( uint32_t vertex_index = uint32_t( _ps.pd.nr_pi_fanins() ); vertex_index < _num_vertices; ++vertex_index )
+        {
+          if ( get_vertex_type( vertex_index ) != vertex_type::mixed && get_vertex_type( vertex_index ) != vertex_type::binary )
+            continue;
+
+          auto label_index = 0;
+
+          /* find label index */
+          if ( get_vertex_type( vertex_index ) == vertex_type::mixed )
+          {
+            for ( const auto& m : mixed_operators )
+            {
+              if ( m == operator_opcode::until_ )
+                break;
+              else
+                label_index++;
+            }
+          }
+          else if ( get_vertex_type( vertex_index ) == vertex_type::binary )
+          {
+            for ( const auto& m : binary_operators )
+            {
+              if ( m == operator_opcode::until_ )
+                break;
+              else
+                label_index++;
+            }
+          }
+
+          auto const left_dag_index = _ps.pd.get_vertex( vertex_index - _ps.pd.nr_pi_fanins() )[0u];
+          auto const right_dag_index = _ps.pd.get_vertex( vertex_index - _ps.pd.nr_pi_fanins() )[1u];
+
+          auto const child_index0 =
+            left_dag_index == 0u ? zeroes.at( vertex_index - _ps.pd.nr_pi_fanins() ) : uint32_t( _ps.pd.nr_pi_fanins() ) + left_dag_index - 1u;
+          auto const child_index1 =
+            right_dag_index == 0u ? zeroes.at( vertex_index - _ps.pd.nr_pi_fanins() ) + ( left_dag_index == 0u ? 1u : 0u ) : uint32_t( _ps.pd.nr_pi_fanins() ) + right_dag_index - 1u;
+          assert( vertex_index > child_index0 );
+          assert( vertex_index > child_index1 );
+
+          auto const t = label( vertex_index, label_index );
+
+          auto const prefix_length = _ps.traces.at( trace_index ).first.prefix_length();
+          auto const trace_length = _ps.traces.at( trace_index ).first.length();
+
+          std::vector<bill::lit_type> as;
+          for ( auto time_index = 0u; time_index < prefix_length; ++time_index )
+          {
+            std::vector<bill::lit_type> bs;
+            for ( auto another_time_index = time_index; another_time_index < trace_length; ++another_time_index )
+            {
+              std::vector<bill::lit_type> cs;
+              for ( auto one_more_time_index = time_index; one_more_time_index < another_time_index; ++one_more_time_index )
+                cs.emplace_back( trace( child_index0, trace_index, one_more_time_index ) );
+              cs.emplace_back( trace( child_index1, trace_index, another_time_index ) );
+              bs.emplace_back( add_tseytin_and( cs ) );
+            }
+            as.emplace_back( add_tseytin_equals( trace( vertex_index, trace_index, time_index ), add_tseytin_or( bs ) ) );
+          }
+
+          for ( auto time_index = prefix_length; time_index < trace_length; ++time_index )
+          {
+            std::vector<bill::lit_type> bs;
+            for ( auto another_time_index = prefix_length; another_time_index < trace_length; ++another_time_index )
+            {
+              std::vector<bill::lit_type> cs;
+              for ( auto const& one_more_time_index : positions_between( time_index, another_time_index, prefix_length, trace_length ) )
+                cs.emplace_back( trace( child_index0, trace_index, one_more_time_index ) );
+              cs.emplace_back( trace( child_index1, trace_index, another_time_index ) );
+              bs.emplace_back( add_tseytin_and( cs ) );
+            }
+            as.emplace_back( add_tseytin_equals( trace( vertex_index, trace_index, time_index ), add_tseytin_or( bs ) ) );
+          }
+          add_clause( { ~t, add_tseytin_and( as ) } );
         }
       }
     }
