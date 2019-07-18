@@ -1,4 +1,5 @@
 #include <bill/sat/solver.hpp>
+#include <copycat/algorithms/exact_ltl_pdag_encoder.hpp>
 #include <copycat/algorithms/ltl_learner.hpp>
 #include <copycat/chain/print.hpp>
 #include <copycat/io/ltl_synthesis_spec_reader.hpp>
@@ -43,6 +44,9 @@ struct exact_ltl_parameters
   /* be verbose? */
   bool verbose = false;
 }; /* exact_ltl_parameters */
+
+namespace copycat
+{
 
 class default_ltl_simulator
 {
@@ -279,11 +283,14 @@ bool simulate( copycat::chain<std::string,std::vector<int>> const& c, copycat::l
   return true;
 }
 
+} /* namespace copycat */
+
+template<
+  typename Solver = bill::solver<bill::solvers::glucose_41>,
+  typename Encoder = copycat::exact_ltl_pdag_encoder<Solver>
+>
 class exact_ltl_engine
 {
-public:
-  using solver_t = bill::solver<bill::solvers::glucose_41>;
-
 public:
   explicit exact_ltl_engine( exact_ltl_parameters const& ps, nlohmann::json& log )
     : _ps( ps )
@@ -338,61 +345,122 @@ public:
 
     std::cout << "[i] bounded synthesis with " << num_nodes << " node" << std::endl;
 
-    copycat::ltl_encoder enc( solver );
-
-    copycat::ltl_encoder_parameter enc_ps;
-    enc_ps.verbose = _ps.verbose;
-    enc_ps.num_nodes = num_nodes;
-    enc_ps.num_propositions = spec.num_propositions;
-    enc_ps.ops = spec.operators;
-
-    for ( const auto& t : spec.good_traces )
-      enc_ps.traces.emplace_back( t, true );
-    for ( const auto& t : spec.bad_traces )
-      enc_ps.traces.emplace_back( t, false );
-
-    /* restart the solver */
-    solver.restart();
-
-    enc.encode( enc_ps );
-    enc.allocate_variables();
-    // enc.print_allocated_variables();
-    enc.check_allocated_variables();
-    enc.create_clauses();
-
-    instance["#variables"] = solver.num_variables();
-    instance["#clauses"] = solver.num_clauses();
-    instance["#nodes"] = num_nodes;
-
-    bill::result::states result;
-    copycat::stopwatch<>::duration time_solving{0};
-    {
-      copycat::stopwatch watch( time_solving );
-      result = _ps.conflict_limit < 0 ? solver.solve() : solver.solve( /* no assumptions */{}, _ps.conflict_limit );
-    }
-    std::cout << fmt::format( "[i] solver: {} in {:8.2f}s\n",
-                              copycat::to_upper( bill::result::to_string( result ) ),
-                              copycat::to_seconds( time_solving ) );
-
-    instance["time_solving"] = fmt::format( "{:8.2f}", copycat::to_seconds( time_solving ) );
-    instance["result"] = bill::result::to_string( result );
-
     bool return_value = false; /* keep going with loop */
-    if ( result == bill::result::states::satisfiable )
+    if constexpr ( std::is_same<Encoder,copycat::ltl_encoder<Solver>>::value )
     {
-      std::stringstream chain_as_string;
-      auto const& c = enc.extract_chain();
-      copycat::write_chain( c, chain_as_string );
-      instance["chain"] = chain_as_string.str();
+      std::cout << "Encoder: exact_ltl_encoder" << std::endl;
+      copycat::ltl_encoder_parameter enc_ps;
+      enc_ps.verbose = _ps.verbose;
+      enc_ps.num_nodes = num_nodes;
+      enc_ps.num_propositions = spec.num_propositions;
+      enc_ps.ops = spec.operators;
 
-      copycat::write_chain( c );
+      for ( const auto& t : spec.good_traces )
+        enc_ps.traces.emplace_back( t, true );
+      for ( const auto& t : spec.bad_traces )
+        enc_ps.traces.emplace_back( t, false );
 
-      auto const sim_result = simulate( c, spec );
-      std::cout << "[i] simulate: " << ( sim_result ? "verified" : "failed" ) << std::endl;
-      instance["verified"] = sim_result;
+      /* restart the solver */
+      solver.restart();
 
-      return_value = true; /* terminate loop */
+      Encoder enc( solver );
+      enc.encode( enc_ps );
+
+      instance["#variables"] = solver.num_variables();
+      instance["#clauses"] = solver.num_clauses();
+      instance["#nodes"] = num_nodes;
+
+      bill::result::states result;
+      copycat::stopwatch<>::duration time_solving{0};
+      {
+        copycat::stopwatch watch( time_solving );
+        result = _ps.conflict_limit < 0 ? solver.solve() : solver.solve( /* no assumptions */{}, _ps.conflict_limit );
+      }
+      std::cout << fmt::format( "[i] solver: {} in {:8.2f}s\n",
+                                copycat::to_upper( bill::result::to_string( result ) ),
+                                copycat::to_seconds( time_solving ) );
+
+      instance["time_solving"] = fmt::format( "{:8.2f}", copycat::to_seconds( time_solving ) );
+      instance["result"] = bill::result::to_string( result );
+
+      if ( result == bill::result::states::satisfiable )
+      {
+        std::stringstream chain_as_string;
+        auto const& c = enc.extract_chain();
+        copycat::write_chain( c, chain_as_string );
+        instance["chain"] = chain_as_string.str();
+
+        copycat::write_chain( c );
+
+        auto const sim_result = simulate( c, spec );
+        std::cout << "[i] simulate: " << ( sim_result ? "verified" : "failed" ) << std::endl;
+        instance["verified"] = sim_result;
+
+        return_value = true; /* terminate loop */
+      }
     }
+
+    if constexpr ( std::is_same<Encoder,copycat::exact_ltl_pdag_encoder<Solver>>::value )
+    {
+      std::cout << "Encoder: exact_ltl_pdag_encoder" << std::endl;
+
+      /* pre-compute partial DAGs to guide synthesis */
+      auto const pdags = copycat::pd_generate_filtered( num_nodes, spec.num_propositions );
+      std::cout << "[i] #pdags: " << pdags.size() << std::endl;
+
+      copycat::exact_ltl_pdag_encoder_parameter enc_ps;
+      enc_ps.verbose = _ps.verbose;
+      enc_ps.num_propositions = spec.num_propositions;
+      enc_ps.ops = spec.operators;
+
+      for ( const auto& t : spec.good_traces )
+        enc_ps.traces.emplace_back( t, true );
+      for ( const auto& t : spec.bad_traces )
+        enc_ps.traces.emplace_back( t, false );
+
+      for ( auto i = 0u; i < pdags.size(); ++i )
+      {
+        if ( pdags.at( i ).get_vertices().size() != num_nodes )
+          continue;
+
+        /* restart the solver */
+        solver.restart();
+
+        enc_ps.pd = pdags.at( i );
+
+        Encoder enc( solver );
+        enc.encode( enc_ps );
+
+        bill::result::states result;
+        copycat::stopwatch<>::duration time_solving{0};
+        {
+          copycat::stopwatch watch( time_solving );
+          result = _ps.conflict_limit < 0 ? solver.solve() : solver.solve( /* no assumptions */{}, _ps.conflict_limit );
+        }
+        std::cout << fmt::format( "[i] solver (pdag #{}/{}): {} in {:8.2f}s\n",
+                                  i, pdags.size(),
+                                  copycat::to_upper( bill::result::to_string( result ) ),
+                                  copycat::to_seconds( time_solving ) );
+
+        if ( result == bill::result::states::satisfiable )
+        {
+          std::stringstream chain_as_string;
+          auto const& c = enc.extract_chain();
+          copycat::write_chain( c, chain_as_string );
+          instance["chain"] = chain_as_string.str();
+
+          copycat::write_chain( c );
+
+          auto const sim_result = simulate( c, spec );
+          std::cout << "[i] simulate: " << ( sim_result ? "verified" : "failed" ) << std::endl;
+          instance["verified"] = sim_result;
+
+          return_value = true; /* terminate loop */
+          break;
+        }
+      }
+    }
+
     json.emplace_back( instance );
     return return_value;
   }
@@ -402,7 +470,7 @@ protected:
   nlohmann::json& _log;
 
   /* solver */
-  solver_t solver;
+  Solver solver;
 }; /* exact_ltl_engine */
 
 int main( int argc, char* argv[] )
