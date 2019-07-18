@@ -372,8 +372,6 @@ public:
     /* get model */
     auto const model = _solver.get_model().model();
 
-    print_partial_dag();
-
     /* chain */
     chain<std::string, std::vector<int>> c;
 
@@ -666,7 +664,8 @@ private:
 
           auto const left_dag_index = _ps.pd.get_vertex( vertex_index - _ps.pd.nr_pi_fanins() )[0u];
           auto const child_index =
-            left_dag_index == 0u ? zeroes.at( vertex_index - _ps.pd.nr_pi_fanins() ) : uint32_t( _ps.pd.nr_pi_fanins() ) + left_dag_index;
+            left_dag_index == 0u ? zeroes.at( vertex_index - _ps.pd.nr_pi_fanins() ) : uint32_t( _ps.pd.nr_pi_fanins() ) + left_dag_index - 1u;
+          assert( child_index < vertex_index );
 
           auto const t = label( vertex_index, label_index );
 
@@ -819,7 +818,8 @@ private:
 
           auto const left_dag_index = _ps.pd.get_vertex( vertex_index - _ps.pd.nr_pi_fanins() )[0u];
           auto const child_index =
-            left_dag_index == 0u ? zeroes.at( vertex_index - _ps.pd.nr_pi_fanins() ) : uint32_t( _ps.pd.nr_pi_fanins() ) + left_dag_index;
+            left_dag_index == 0u ? zeroes.at( vertex_index - _ps.pd.nr_pi_fanins() ) : uint32_t( _ps.pd.nr_pi_fanins() ) + left_dag_index - 1u;
+          assert( child_index < vertex_index );
 
           auto const t = label( vertex_index, label_index );
 
