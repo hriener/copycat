@@ -69,7 +69,7 @@ public:
       for ( uint32_t j = 0u; j < 18; ++j )
         for ( uint32_t k = 0u; k < 18; ++k )
           _disabled_matrix[i][j][k] = 0u;
-    
+
     /* first vertex can only point to PIs */
     _as[0u] = _bs[0u] = 0u;
 
@@ -78,13 +78,13 @@ public:
     _stop_level = -1;
   }
 
-  
+
   /*! \brief Returns number of vertices */
   uint32_t num_vertices() const
   {
     return _num_vertices;
   }
-  
+
   /*! \brief Set callback function */
   void set_callback( std::function<void(partial_dag_generator<2u>*)> const &f )
   {
@@ -96,8 +96,8 @@ public:
   {
     _callback = std::move( f );
   }
-  
-  /*! \brief clear callback function */  
+
+  /*! \brief clear callback function */
   void clear_callback()
   {
     _callback = 0;
@@ -108,9 +108,9 @@ public:
     _num_solutions = 0;
     _level = 1;
     _stop_level = -1;
-    
+
     search_noreapply_dags();
-    
+
     return _num_solutions;
   }
 
@@ -131,7 +131,7 @@ public:
       }
     }
   }
-  
+
   void search_noreapply_dags()
   {
     if ( _level == _num_vertices )
@@ -234,14 +234,14 @@ private:
   uint32_t _num_solutions = 0u;
   uint32_t _level = 0u;
   int32_t  _stop_level = -1;
-  
+
   /* Array indicating which steps have been covered (and how many times.) */
   std::array<uint32_t, 18> _covered_steps;
 
   /* Array indicating which steps are ``disabled'', meaning that
      selecting them will not result in a valid DAG. */
   std::array<std::array<std::array<uint32_t, 18>, 18>, 18> _disabled_matrix;
-  
+
   /* Function called when a solution is found */
   std::function<void(partial_dag_generator<2u>*)> _callback;
 
@@ -258,14 +258,14 @@ inline std::vector<percy::partial_dag> pd_generate( uint32_t num_vertices )
   gen.set_callback([&g,&dags](partial_dag_generator<2u>* gen){
       for ( uint32_t i = 0u; i < gen->num_vertices(); ++i )
         g.set_vertex( i, gen->_bs[i], gen->_as[i] );
-      
+
       dags.emplace_back( g );
     });
 
   g.reset( 2u, num_vertices );
   gen.reset( num_vertices );
   gen.count_dags();
-  
+
   return dags;
 }
 
@@ -283,10 +283,10 @@ inline std::vector<percy::partial_dag> pd_generate_filtered( uint32_t num_vertic
         dags.emplace_back( g );
     });
 
-  g.reset( 2u, num_vertices );  
+  g.reset( 2u, num_vertices );
   gen.reset( num_vertices );
   gen.count_dags();
-  
+
   return dags;
 }
 
@@ -308,11 +308,11 @@ struct exact_ltl_pdag_encoder_parameter
 
   /* traces */
   std::vector<std::pair<trace, bool>> traces;
-  
+
   /* be verbose? */
   bool verbose = true;
 }; /* exact_ltl_pdag_encoder_paramter */
-  
+
 template<typename Solver>
 class exact_ltl_pdag_encoder
 {
@@ -353,14 +353,14 @@ public:
     _ps = ps;
     _num_nodes = ps.pd.nr_vertices();
     _num_vertices = _ps.pd.nr_pi_fanins() + _num_nodes;
-    
+
     if ( _ps.verbose )
       std::cout << "[i] exact_ltl_pdag_encoder::encoder" << std::endl;
 
     /* some input checks */
     assert( uint32_t( _ps.pd.nr_vertices() ) > 0u && "PD parameter required" );
     assert( _ps.num_propositions > 0u && "No atomic propositions specified" );
-    
+
     // print_partial_dag(); /* debug */
     allocate_variables();
     // print_variables(); /* debug */
@@ -378,7 +378,8 @@ public:
     chain<std::string, std::vector<int>> c;
 
     std::unordered_map<uint32_t, uint32_t> pi_to_step;
-    
+    std::unordered_map<uint32_t, uint32_t> node_to_step;
+
     for ( auto i = 0; i < _ps.pd.nr_vertices(); ++i )
     {
       auto const pd_vertex = _ps.pd.get_vertex( i );
@@ -407,7 +408,7 @@ public:
       }
 
       std::vector<int> children;
-      
+
       /* left child */
       if ( pd_vertex[0u] == 0u )
       {
@@ -439,43 +440,58 @@ public:
           pi_to_step.emplace( pi_index, step_index );
         }
       }
-
-      if ( pd_vertex[1u] == 0u )
+      else
       {
-        /* map pi to vertex id in synthesis problem */
-        auto const vertex_index = zeroes[i] + ( pd_vertex[0u] == 0 );
+        assert( node_to_step.find( pd_vertex[0u] - 1u ) != node_to_step.end() );
+        children.emplace_back( node_to_step.at( pd_vertex[0u] - 1u ) );
+      }
 
-        /* get the label for this pi */
-        auto pi_index = 0u;
-        for ( auto label_index = 0u; label_index < num_labels( vertex_index ); ++label_index )
+      /* right child */
+      if ( s == "|" || s == "&" || s == "U" || s == "->" )
+      {
+        if ( pd_vertex[1u] == 0u )
         {
-          if ( model.at( label( vertex_index, label_index ).variable() ) == bill::lbool_type::true_ )
+          /* map pi to vertex id in synthesis problem */
+          auto const vertex_index = zeroes[i] + ( pd_vertex[0u] == 0 );
+
+          /* get the label for this pi */
+          auto pi_index = 0u;
+          for ( auto label_index = 0u; label_index < num_labels( vertex_index ); ++label_index )
           {
-            pi_index = label_index;
-            break;
+            if ( model.at( label( vertex_index, label_index ).variable() ) == bill::lbool_type::true_ )
+            {
+              pi_index = label_index;
+              break;
+            }
           }
-        }
 
-        /* pi_index has already a step then use it */
-        auto const it = pi_to_step.find( pi_index );
-        if ( it != pi_to_step.end() )
-        {
-          children.emplace_back( it->second );
+          /* pi_index has already a step then use it */
+          auto const it = pi_to_step.find( pi_index );
+          if ( it != pi_to_step.end() )
+          {
+            children.emplace_back( it->second );
+          }
+          else
+          {
+            /* otherwise create a new step for the pi */
+            auto const step_index = c.add_step( fmt::format( "x{}", pi_index ), {} );
+            children.emplace_back( step_index );
+            pi_to_step.emplace( pi_index, step_index );
+          }
         }
         else
         {
-          /* otherwise create a new step for the pi */
-          auto const step_index = c.add_step( fmt::format( "x{}", pi_index ), {} );
-          children.emplace_back( step_index );
-          pi_to_step.emplace( pi_index, step_index );
+          assert( node_to_step.find( pd_vertex[1u] - 1u ) != node_to_step.end() );
+          children.emplace_back( node_to_step.at( pd_vertex[1u] - 1u ) );
         }
       }
-      
-      c.add_step( s, children );
+
+      auto const step_index = c.add_step( s, children );
+      node_to_step.emplace( i, step_index );
     }
     return c;
   }
-  
+
 private:
   /*! \brief Allocate variables */
   void allocate_variables()
@@ -491,13 +507,13 @@ private:
         if ( v == 0u )
           ++counter;
     }
-    
+
     /* Count number of mixed and binary operators.  A mixed operator
      * could be either an unary or binary operator.
      */
     mixed_operators.clear();
     binary_operators.clear();
-    
+
     for ( auto i = 0u; i < _ps.ops.size(); ++i )
     {
       auto const arity = operator_opcode_arity( _ps.ops.at( i ) );
@@ -511,7 +527,7 @@ private:
         mixed_operators.emplace_back( _ps.ops.at( i ) );
       }
     }
-    
+
     /* Compute label offsets for each node */
     label_offset.resize( _num_vertices + 1u );
 
@@ -522,7 +538,7 @@ private:
       offset += num_labels( vertex_index );
     }
     label_offset[_num_vertices] = offset;
-    
+
     /* Compute trace offsets for each trace */
     trace_offset.resize( _ps.traces.size() + 1u );
     trace_vars_begin = label_offset[label_offset.size() - 1u];
@@ -536,12 +552,12 @@ private:
 
     tseytin_vars_begin = trace( _num_vertices-1u, _ps.traces.size()-1u, _ps.traces.at( _ps.traces.size()-1u ).first.length()-1u ).variable() + 1u;
     std::cout << "tseytin_vars_begin = " << tseytin_vars_begin << std::endl;
-    
+
     /* pre-allocate variables in solver */
     _solver.add_variables( tseytin_vars_begin );
   }
 
-  /*! \brief Print variable layout (for debugging purpose only) */  
+  /*! \brief Print variable layout (for debugging purpose only) */
   void print_variables() const
   {
     /* label variables */
@@ -615,7 +631,7 @@ private:
               cb.emplace_back( ~trace( vertex_index, trace_index, time_index ) );
             }
           }
-          
+
           if ( cb.size() == 1u )
           {
             add_clause( { ~label( vertex_index, prop_index ), cb.at( 0u ) } );              
@@ -628,7 +644,7 @@ private:
         }
       }
     }
-    
+
     /* Boolean operators: NOT, AND, OR, IMPLIES */
     if ( std::find( std::begin( _ps.ops ), std::end( _ps.ops ), operator_opcode::not_ ) != std::end( _ps.ops ) )
     {
@@ -647,7 +663,7 @@ private:
             else
               label_index++;
           }
-          
+
           auto const left_dag_index = _ps.pd.get_vertex( vertex_index - _ps.pd.nr_pi_fanins() )[0u];
           auto const child_index =
             left_dag_index == 0u ? zeroes.at( vertex_index - _ps.pd.nr_pi_fanins() ) : uint32_t( _ps.pd.nr_pi_fanins() ) + left_dag_index;
@@ -663,7 +679,7 @@ private:
           auto const t_and = add_tseytin_and( cb );
           add_clause( { ~t, t_and } );
         }
-      }      
+      }
     }
 
     if ( std::find( std::begin( _ps.ops ), std::end( _ps.ops ), operator_opcode::or_ ) != std::end( _ps.ops ) )
@@ -676,7 +692,7 @@ private:
             continue;
 
           auto label_index = 0;
-          
+
           /* find label index */
           if ( get_vertex_type( vertex_index ) == vertex_type::mixed )
           {
@@ -708,7 +724,7 @@ private:
             right_dag_index == 0u ? zeroes.at( vertex_index - _ps.pd.nr_pi_fanins() ) + ( left_dag_index == 0u ? 1u : 0u ) : uint32_t( _ps.pd.nr_pi_fanins() ) + right_dag_index - 1u;
           assert( vertex_index > child_index0 );
           assert( vertex_index > child_index1 );
-          
+
           auto const t = label( vertex_index, label_index );
 
           std::vector<bill::lit_type> equals;
@@ -734,7 +750,7 @@ private:
             continue;
 
           auto label_index = 0;
-          
+
           /* find label index */
           if ( get_vertex_type( vertex_index ) == vertex_type::mixed )
           {
@@ -756,7 +772,7 @@ private:
                 label_index++;
             }
           }
-            
+
           auto const left_dag_index = _ps.pd.get_vertex( vertex_index - _ps.pd.nr_pi_fanins() )[0u];
           auto const right_dag_index = _ps.pd.get_vertex( vertex_index - _ps.pd.nr_pi_fanins() )[1u];
 
@@ -768,7 +784,7 @@ private:
           assert( vertex_index > child_index1 );
 
           auto const t = label( vertex_index, label_index );
-            
+
           std::vector<bill::lit_type> equals;
           for ( auto time_index = 0u; time_index < _ps.traces.at( trace_index ).first.length(); ++time_index )
           {
@@ -781,7 +797,7 @@ private:
         }
       }
     }
-    
+
     /* temporal operators: X, U, G, F */
     if ( std::find( std::begin( _ps.ops ), std::end( _ps.ops ), operator_opcode::next_ ) != std::end( _ps.ops ) )
     {
@@ -800,14 +816,14 @@ private:
             else
               label_index++;
           }
-          
+
           auto const left_dag_index = _ps.pd.get_vertex( vertex_index - _ps.pd.nr_pi_fanins() )[0u];
           auto const child_index =
             left_dag_index == 0u ? zeroes.at( vertex_index - _ps.pd.nr_pi_fanins() ) : uint32_t( _ps.pd.nr_pi_fanins() ) + left_dag_index;
 
           auto const t = label( vertex_index, label_index );
-          
-          std::vector<bill::lit_type> equals;          
+
+          std::vector<bill::lit_type> equals;
           auto const trace_length = _ps.traces.at( trace_index ).first.length();
           for ( auto time_index = 0u; time_index < trace_length - 1u; ++time_index )
           {
@@ -820,13 +836,13 @@ private:
               trace( vertex_index, trace_index, trace_length - 1u ),
               prefix_length > 0u ? trace( child_index, trace_index, prefix_length ) : trace( child_index, trace_index, 0u ) );
             equals.emplace_back( t_eq );
-          
+
           auto const t_and = add_tseytin_and( equals );
           add_clause( { ~t, t_and } );
         }
       }
     }
-    
+
     /* traces */
     for ( auto trace_index = 0u; trace_index < _ps.traces.size(); ++trace_index )
     {
@@ -840,7 +856,7 @@ private:
       }
     }
   }
-  
+
   /*! \brief Print the partial DAG (for debugging purpose only) */
   void print_partial_dag() const
   {
@@ -853,7 +869,7 @@ private:
     }
     std::cout << std::endl;
   }
-  
+
   /* \brief Label variable */
   bill::lit_type label( uint32_t vertex_index, uint32_t label_index ) const
   {
@@ -919,7 +935,7 @@ private:
 
     if ( ls.size() == 1u )
       return ls[0u];
-    
+
     if ( ls.size() == 2u )
       return add_tseytin_and( ls[0u], ls[1u] );
 
@@ -927,7 +943,7 @@ private:
     auto const it = and_compute_table.find( ls );
     if ( it != and_compute_table.end() )
       return it->second;
-    
+
     auto const r = add_variable();
 
     std::vector<bill::lit_type> cls;
@@ -940,7 +956,7 @@ private:
 
     /* insert into compute table */
     and_compute_table.emplace( ls, r );
-    
+
     return r;
   }
 
@@ -1007,7 +1023,7 @@ private:
   {
     return bill::lit_type( _solver.add_variable(), pol );
   }
-  
+
   void add_clause( std::vector<bill::lit_type> const& cl )
   {
     // for ( const auto& l : cl )
@@ -1016,7 +1032,7 @@ private:
 
     _solver.add_clause( cl );
   }
-  
+
 private:
   Solver& _solver;
 
@@ -1028,7 +1044,7 @@ private:
   std::unordered_map<std::vector<bill::lit_type>, bill::lit_type, lit_vector_hash> and_compute_table;
   std::unordered_map<std::vector<bill::lit_type>, bill::lit_type, lit_vector_hash> or_compute_table;
   std::unordered_map<std::array<bill::lit_type, 2u>, bill::lit_type, lit_array2_hash> equals_compute_table;
-  
+
   std::vector<operator_opcode> mixed_operators;
   std::vector<operator_opcode> binary_operators;
   std::vector<uint32_t> zeroes;
@@ -1037,5 +1053,5 @@ private:
   uint32_t trace_vars_begin = 0u;
   uint32_t tseytin_vars_begin = 0u;
 }; /* exact_ltl_pdag_encoder */
-  
+
 } /* namespace copycat */
