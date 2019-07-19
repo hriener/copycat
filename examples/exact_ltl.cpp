@@ -323,6 +323,7 @@ public:
 
     /* bounded synthesis loop */
     copycat::stopwatch<>::duration time_total{0};
+    total_pdags_explored = 0u;
     {
       copycat::stopwatch watch( time_total );
 
@@ -333,6 +334,7 @@ public:
 
       entry["instances"] = instances;
     }
+    entry["#total_pdags_explored"] = total_pdags_explored;
     entry["total_time"] = fmt::format( "{:8.2f}", copycat::to_seconds( time_total ) );
     std::cout << fmt::format( "[i] total time: {:8.2f}s\n", copycat::to_seconds( time_total ) );
 
@@ -418,8 +420,19 @@ public:
       for ( const auto& t : spec.bad_traces )
         enc_ps.traces.emplace_back( t, false );
 
+      instance["#pdags"] = pdags.size();
+      instance["#nodes"] = num_nodes;
+      // instance["#nodes"] = num_nodes;
+
+      uint32_t total_num_vars = 0u;
+      uint32_t total_num_clauses = 0u;
+      uint32_t num_considered_instances = 0u;
+
+      copycat::stopwatch<>::duration time_solving{0};
       for ( auto i = 0u; i < pdags.size(); ++i )
       {
+        ++total_pdags_explored;
+
         if ( pdags.at( i ).get_vertices().size() != num_nodes )
           continue;
 
@@ -431,8 +444,15 @@ public:
         Encoder enc( solver );
         enc.encode( enc_ps );
 
+        ++num_considered_instances;
+        total_num_vars += solver.num_variables();
+        total_num_clauses += solver.num_clauses();
+
+        instance["#variables"] = total_num_vars / num_considered_instances;
+        instance["#clauses"] = total_num_clauses / num_considered_instances;
+        instance["#pdags_explored"] = ( i + 1 );
+
         bill::result::states result;
-        copycat::stopwatch<>::duration time_solving{0};
         {
           copycat::stopwatch watch( time_solving );
           result = _ps.conflict_limit < 0 ? solver.solve() : solver.solve( /* no assumptions */{}, _ps.conflict_limit );
@@ -441,6 +461,8 @@ public:
                                   i, pdags.size(),
                                   copycat::to_upper( bill::result::to_string( result ) ),
                                   copycat::to_seconds( time_solving ) );
+
+        instance["time_solving"] = fmt::format( "{:8.2f}", copycat::to_seconds( time_solving ) );
 
         if ( result == bill::result::states::satisfiable )
         {
@@ -471,6 +493,8 @@ protected:
 
   /* solver */
   Solver solver;
+
+  uint32_t total_pdags_explored = 0u;
 }; /* exact_ltl_engine */
 
 int main( int argc, char* argv[] )
