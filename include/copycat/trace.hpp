@@ -112,7 +112,9 @@ public:
       }
       os << '}';
     }
-    os << " )*" << std::endl;
+
+    if ( _suffix_length > 0 )
+      os << " )*" << std::endl;
   }
 
   uint32_t count_propositions() const
