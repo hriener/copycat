@@ -119,8 +119,7 @@ void simulate( Ntk const& ntk, Simulator& sim, uint32_t num_time_steps, Callback
   using combinational_simulator_t = default_simulator<bool>;
   combinational_simulator_t comb_sim( assignments );
 
-  uint32_t index;
-  for ( auto k = 0u; k < num_time_steps; ++k )
+  for ( auto k = 0u; k < num_time_steps - 1u; ++k )
   {
     callback.on_time_frame_start( k );
 
@@ -144,16 +143,16 @@ void simulate( Ntk const& ntk, Simulator& sim, uint32_t num_time_steps, Callback
       });
 
     /* prepare inputs for next iteration */
-    index = 0;
+    uint32_t index = 0u;
     ntk.foreach_pi( [&]( const auto& node ){
         (void)node;
-        assignments[index] = sim.compute_pi( index, k );
-        index++;
+        assignments[index] = sim.compute_pi( index, k+1 );
+        ++index;
       });
     ntk.foreach_ri( [&]( const auto& f ){
         bool const value = v[ ntk.get_node( f )];
         assignments[index] = ntk.is_complemented( f ) ? !value : value;
-        index++;
+        ++index;
       });
 
     callback.on_time_frame_end( k );
