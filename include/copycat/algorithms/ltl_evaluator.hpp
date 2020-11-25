@@ -40,7 +40,7 @@
 
 namespace copycat
 {
-
+  
 /*! \brief Abstract class for default_ltl_evaluator. */
 class default_ltl_evaluator
 {
@@ -51,6 +51,149 @@ public:
   explicit default_ltl_evaluator() = delete;
 }; /* default_ltl_evaluator */
 
+class ltl_finite_trace_evaluator_with_counting_semantics
+{
+public:
+  using formula = ltl_formula_store::ltl_formula;
+  using node = ltl_formula_store::node;
+
+  using result_type = euint32_pair;
+
+public:
+  explicit ltl_finite_trace_evaluator_with_counting_semantics( ltl_formula_store& ltl )
+    : ltl( ltl )
+  {
+  }
+
+  result_type evaluate_formula( formula const& f, trace const& t, uint32_t pos ) const
+  {
+    assert( t.is_finite() && "finite trace evaluator only looks at the prefix of the trace" );
+
+    /* negation */
+    if ( ltl.is_complemented( f ) )
+    {
+      return evaluate_formula( !f, t, pos ).swap();
+    }
+    
+    assert( !ltl.is_complemented( f ) );
+    auto const n = ltl.get_node( f );
+
+    /* constant */
+    if ( ltl.is_constant( n ) )
+    {
+      return evaluate_constant( n );
+    }
+    /* variable */
+    else if ( ltl.is_variable( n ) )
+    {
+      return evaluate_variable( n, t, pos );
+    }
+    /* or */
+    else if ( ltl.is_or( n ) )
+    {
+      return evaluate_or( n, t, pos );
+    }
+    /* next */
+    else if ( ltl.is_next( n ) )
+    {
+      return evaluate_next( n, t, pos );
+    }
+    /* until */
+    else if ( ltl.is_until( n ) )
+    {
+      return evaluate_until( n, t, pos );
+    }
+    /* eventually */
+    else if ( ltl.is_eventually( n ) )
+    {
+      return evaluate_eventually( n, t, pos );
+    }
+    else
+    {
+      std::cerr << "[e] unknown operator" << std::endl;
+      assert( false );
+    }
+  }
+
+  result_type evaluate_constant( node const& n ) const
+  {
+    return euint32_pair( 0, 0 ); // FIXME
+  }
+
+  result_type evaluate_variable( node const& n, trace const& t, uint32_t pos ) const
+  {
+    if ( pos >= t.length() )
+    {
+      return euint32_pair( 0, 0 );
+    }
+    else
+    {
+      assert( pos < t.length() );
+      return t.has( pos, n ) ? euint32_pair( 0, euint32_t::impossible() ) : euint32_pair( euint32_t::impossible(), 0 );
+    }
+  }
+
+  result_type evaluate_or( node const& n, trace const& t, uint32_t pos ) const
+  {
+    std::array<formula,2> subformulas;
+    ltl.foreach_fanin( n, [&]( const auto& formula, uint32_t index ) {
+        subformulas[index] = formula;
+      });
+
+    return evaluate_formula( subformulas[0], t, pos ).minmax( evaluate_formula( subformulas[1], t, pos ) );
+  }
+
+  result_type evaluate_next( node const& n, trace const& t, uint32_t pos ) const
+  {
+    std::array<formula,2> subformulas;
+    ltl.foreach_fanin( n, [&]( const auto& formula, uint32_t index ) {
+        subformulas[index] = formula;
+      });
+    
+    return evaluate_formula( subformulas[0], t, pos+1 ).increment();
+  }
+
+  result_type evaluate_until( node const& n, trace const& t, uint32_t pos ) const
+  {
+    std::array<formula,2> subformulas;
+    ltl.foreach_fanin( n, [&]( const auto& formula, uint32_t index ) {
+        subformulas[index] = formula;
+      });
+
+    if ( pos >= t.length() )
+    {
+      return evaluate_formula( subformulas[1], t, pos ).minmax(
+               evaluate_formula( subformulas[0], t, pos ).maxmin( evaluate_until( n, t, pos+1 ) ) );
+    }
+    else
+    {
+      assert( pos < t.length() );
+      return evaluate_formula( subformulas[1], t, pos ).minmax(
+               evaluate_formula( subformulas[0], t, pos ).maxmin( euint32_pair( euint32_t::impossible(), euint32_t::infinite() ) ) );
+    }
+  }
+
+  result_type evaluate_eventually( node const& n, trace const& t, uint32_t pos ) const
+  {
+    std::array<formula,2> subformulas;
+    ltl.foreach_fanin( n, [&]( const auto& formula, uint32_t index ) {
+        subformulas[index] = formula;
+      });
+
+    if ( pos >= t.length() )
+    {
+      return evaluate_formula( subformulas[0], t, pos ).minmax( euint32_pair( euint32_t::impossible(), euint32_t::infinite() ) );
+    }
+    else
+    {
+      return evaluate_formula( subformulas[0], t, pos ).minmax( evaluate_eventually( n, t, pos+1 ).increment() );
+    }
+  }
+
+protected:
+  ltl_formula_store& ltl;
+}; /* ltl_finite_trace_evaluator_with_counting_semantics */
+  
 /*! \brief LTL evaluator for finite traces using three-valued logic */
 class ltl_finite_trace_evaluator
 {
@@ -176,5 +319,5 @@ typename Evaluator::result_type evaluate( ltl_formula_store::ltl_formula const& 
 {
   return eval.evaluate_formula( f, t, 0 );
 }
-
+  
 } /* namespace copycat */
